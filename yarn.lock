@@ -6740,6 +6740,10 @@ shallow-compare@1.2.0:
   version "1.2.0"
   resolved "https://registry.yarnpkg.com/shallow-compare/-/shallow-compare-1.2.0.tgz#b58dbb0ef5c21814946354760bf06e5aac085055"
 
+shallow-compare@1.2.1:
+  version "1.2.1"
+  resolved "https://registry.yarnpkg.com/shallow-compare/-/shallow-compare-1.2.1.tgz#6a42931a81f8ab52bfad229c14f1635e5488ba7a"
+
 shallowequal@0.2.2:
   version "0.2.2"
   resolved "https://registry.yarnpkg.com/shallowequal/-/shallowequal-0.2.2.tgz#1e32fd5bcab6ad688a4812cb0cc04efc75c7014e"
