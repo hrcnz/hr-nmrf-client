@@ -21,7 +21,7 @@ import { loadEntitiesIfNeeded, updatePath } from 'containers/App/actions';
 
 import ButtonHero from 'components/buttons/ButtonHero';
 import Section from 'components/styled/Section';
-import NormalImg from 'components/Img';
+// import NormalImg from 'components/Img';
 import Footer from 'components/Footer';
 
 import appMessages from 'containers/App/messages';
