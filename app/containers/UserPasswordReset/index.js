@@ -4,23 +4,27 @@
  *
  */
 
-import React, { PropTypes } from 'react';
+import React from 'react';
+import PropTypes from 'prop-types';
 import { connect } from 'react-redux';
 import Helmet from 'react-helmet';
-// import { FormattedMessage } from 'react-intl';
-import { createStructuredSelector } from 'reselect';
 
-import Page from 'components/Page';
-import SimpleForm from 'components/forms/SimpleForm';
+import Loading from 'components/Loading';
+import ContentNarrow from 'components/ContentNarrow';
+import ContentHeader from 'components/ContentHeader';
+import AuthForm from 'components/forms/AuthForm';
 
 import { updatePath } from 'containers/App/actions';
 
-import { reset } from './actions';
-import makeUserPasswordResetSelector from './selectors';
+import appMessages from 'containers/App/messages';
 import messages from './messages';
+
+import { reset } from './actions';
+import { selectDomain } from './selectors';
 
 export class UserPasswordReset extends React.PureComponent { // eslint-disable-line react/prefer-stateless-function
   render() {
+    const { resetSending, resetError } = this.props.viewDomain.page;
     const required = (val) => val && val.length;
 
     return (
@@ -34,77 +38,70 @@ export class UserPasswordReset extends React.PureComponent { // eslint-disable-l
             },
           ]}
         />
-        <Page
-          title={this.context.intl.formatMessage(messages.pageTitle)}
-          actions={
-            [
-              {
-                type: 'simple',
-                title: 'Cancel',
-                onClick: this.props.handleCancel,
-              },
-              {
-                type: 'primary',
-                title: 'Reset',
-                onClick: () => this.props.handleSubmit(
-                  this.props.userPasswordReset.form.data
-                ),
-              },
-            ]
+        <ContentNarrow>
+          <ContentHeader
+            title={this.context.intl.formatMessage(messages.pageTitle)}
+          />
+          {resetSending &&
+            <Loading />
           }
-        >
-          { this.props.userPasswordReset.form &&
-            <SimpleForm
+          {resetError &&
+            <p>{resetError}</p>
+          }
+          { this.props.viewDomain.form &&
+            <AuthForm
               model="userPasswordReset.form.data"
               handleSubmit={(formData) => this.props.handleSubmit(formData)}
               handleCancel={this.props.handleCancel}
-              labels={{ submit: 'Reset password' }}
+              labels={{ submit: this.context.intl.formatMessage(messages.submit) }}
               fields={[
                 {
                   id: 'password',
                   controlType: 'input',
                   model: '.password',
+                  type: 'password',
                   placeholder: this.context.intl.formatMessage(messages.fields.password.placeholder),
                   validators: {
                     required,
                   },
                   errorMessages: {
-                    required: this.context.intl.formatMessage(messages.fieldRequired),
+                    required: this.context.intl.formatMessage(appMessages.forms.fieldRequired),
                   },
                 },
                 {
                   id: 'passwordConfirmation',
                   controlType: 'input',
                   model: '.passwordConfirmation',
+                  type: 'password',
                   placeholder: this.context.intl.formatMessage(messages.fields.passwordConfirmation.placeholder),
                   validators: {
                     required,
                   },
                   errorMessages: {
-                    required: this.context.intl.formatMessage(messages.fieldRequired),
+                    required: this.context.intl.formatMessage(appMessages.forms.fieldRequired),
                   },
                 },
               ]}
             />
           }
-        </Page>
+        </ContentNarrow>
       </div>
     );
   }
 }
 
 UserPasswordReset.propTypes = {
-  userPasswordReset: PropTypes.object.isRequired,
+  viewDomain: PropTypes.object.isRequired,
   handleSubmit: PropTypes.func.isRequired,
   handleCancel: PropTypes.func.isRequired,
 };
 
 UserPasswordReset.contextTypes = {
-  intl: React.PropTypes.object.isRequired,
+  intl: PropTypes.object.isRequired,
 };
 
-const mapStateToProps = createStructuredSelector({
-  userPasswordReset: makeUserPasswordResetSelector(),
+const mapStateToProps = (state) => ({
+  viewDomain: selectDomain(state),
 });
 
 export function mapDispatchToProps(dispatch) {

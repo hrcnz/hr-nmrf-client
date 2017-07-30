@@ -1,5 +1,5 @@
 {
-  "app.containers.App.app.title" : "Sadata",
-  "app.containers.App.app.claim" : "Samoa's home of human rights implementation",
-  "app.containers.HomePage.intro" : "Welcome to Sadata, this is the introductory text that provides the user with some context and a brief overview about this site and its purpose. Two or three sentences will likely be sufficient to provide the user with some guidance. By the way, all text bits including this intro text can be updated in or added to the translations file"
+  "app.containers.App.app.title" : "New Zealand's National Plan of Action",
+  "app.containers.App.app.claim" : "Mahere Rautāki a Motu",
+  "app.containers.HomePage.intro" : "This National Plan sets out the actions the Government is taking to protect and promote Human Rights as a result of the commitments it made through its second Universal Periodic Review (UPR) before the United Nations Human Rights Council in 2014"
 }

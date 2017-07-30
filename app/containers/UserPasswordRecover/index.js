@@ -4,23 +4,35 @@
  *
  */
 
-import React, { PropTypes } from 'react';
+import React from 'react';
+import PropTypes from 'prop-types';
+import { FormattedMessage } from 'react-intl';
 import { connect } from 'react-redux';
 import Helmet from 'react-helmet';
-// import { FormattedMessage } from 'react-intl';
-import { createStructuredSelector } from 'reselect';
+import styled from 'styled-components';
 
-import Page from 'components/Page';
-import SimpleForm from 'components/forms/SimpleForm';
+import Icon from 'components/Icon';
+import Loading from 'components/Loading';
+import ContentNarrow from 'components/ContentNarrow';
+import ContentHeader from 'components/ContentHeader';
+import AuthForm from 'components/forms/AuthForm';
+import A from 'components/styled/A';
 
 import { updatePath } from 'containers/App/actions';
 
-import { recover } from './actions';
-import makeUserPasswordRecoverSelector from './selectors';
+import appMessages from 'containers/App/messages';
 import messages from './messages';
+
+import { recover } from './actions';
+import { selectDomain } from './selectors';
+
+const BottomLinks = styled.div`
+  padding: 2em 0;
+`;
 
 export class UserPasswordRecover extends React.PureComponent { // eslint-disable-line react/prefer-stateless-function
   render() {
+    const { error, sending } = this.props.viewDomain.page;
     const required = (val) => val && val.length;
 
     return (
@@ -34,31 +46,22 @@ export class UserPasswordRecover extends React.PureComponent { // eslint-disable
             },
           ]}
         />
-        <Page
-          title={this.context.intl.formatMessage(messages.pageTitle)}
-          actions={
-            [
-              {
-                type: 'simple',
-                title: 'Cancel',
-                onClick: this.props.handleCancel,
-              },
-              {
-                type: 'primary',
-                title: 'Recover',
-                onClick: () => this.props.handleSubmit(
-                  this.props.userPasswordRecover.form.data
-                ),
-              },
-            ]
+        <ContentNarrow>
+          <ContentHeader
+            title={this.context.intl.formatMessage(messages.pageTitle)}
+          />
+          {error &&
+            <p>{error}</p>
           }
-        >
-          { this.props.userPasswordRecover.form &&
-            <SimpleForm
+          {sending &&
+            <Loading />
+          }
+          { this.props.viewDomain.form &&
+            <AuthForm
               model="userPasswordRecover.form.data"
               handleSubmit={(formData) => this.props.handleSubmit(formData)}
               handleCancel={this.props.handleCancel}
-              labels={{ submit: 'Recover password' }}
+              labels={{ submit: this.context.intl.formatMessage(messages.submit) }}
               fields={[
                 {
                   id: 'email',
@@ -69,30 +72,45 @@ export class UserPasswordRecover extends React.PureComponent { // eslint-disable
                     required,
                   },
                   errorMessages: {
-                    required: this.context.intl.formatMessage(messages.fieldRequired),
+                    required: this.context.intl.formatMessage(appMessages.forms.fieldRequired),
                   },
                 },
               ]}
             />
           }
-        </Page>
+          <BottomLinks>
+            <p>
+              <A
+                href="/login"
+                onClick={(evt) => {
+                  if (evt !== undefined && evt.preventDefault) evt.preventDefault();
+                  this.props.handleLink('/login');
+                }}
+              >
+                <FormattedMessage {...messages.loginLink} />
+                <Icon name="arrowRight" text textRight size="1em" />
+              </A>
+            </p>
+          </BottomLinks>
+        </ContentNarrow>
       </div>
     );
   }
 }
 
 UserPasswordRecover.propTypes = {
-  userPasswordRecover: PropTypes.object.isRequired,
+  viewDomain: PropTypes.object.isRequired,
   handleSubmit: PropTypes.func.isRequired,
   handleCancel: PropTypes.func.isRequired,
+  handleLink: PropTypes.func.isRequired,
 };
 
 UserPasswordRecover.contextTypes = {
-  intl: React.PropTypes.object.isRequired,
+  intl: PropTypes.object.isRequired,
 };
 
-const mapStateToProps = createStructuredSelector({
-  userPasswordRecover: makeUserPasswordRecoverSelector(),
+const mapStateToProps = (state) => ({
+  viewDomain: selectDomain(state),
 });
 
 export function mapDispatchToProps(dispatch) {
@@ -102,6 +120,9 @@ export function mapDispatchToProps(dispatch) {
     },
     handleCancel: () => {
       dispatch(updatePath('/'));
+    },
+    handleLink: (path) => {
+      dispatch(updatePath(path));
     },
   };
 }

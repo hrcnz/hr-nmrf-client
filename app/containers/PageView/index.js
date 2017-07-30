@@ -4,27 +4,38 @@
  *
  */
 
-import React, { PropTypes } from 'react';
+import React from 'react';
+import PropTypes from 'prop-types';
 import { connect } from 'react-redux';
 import Helmet from 'react-helmet';
 import { FormattedMessage } from 'react-intl';
-import { find } from 'lodash/collection';
 
-import { loadEntitiesIfNeeded, updatePath } from 'containers/App/actions';
+import { loadEntitiesIfNeeded, updatePath, closeEntity } from 'containers/App/actions';
 
-import { PUBLISH_STATUSES } from 'containers/App/constants';
+import { CONTENT_SINGLE } from 'containers/App/constants';
 
-import Page from 'components/Page';
-import EntityView from 'components/views/EntityView';
+import Loading from 'components/Loading';
+import Content from 'components/Content';
+import ContentHeader from 'components/ContentHeader';
+import EntityView from 'components/EntityView';
 
 import {
-  getEntity,
-  isReady,
-  isUserAdmin,
-  isUserContributor,
+  selectReady,
+  selectIsUserAdmin,
+  selectIsUserContributor,
 } from 'containers/App/selectors';
 
+import {
+  getTitleField,
+  getStatusField,
+  getMetaField,
+  getMarkdownField,
+} from 'utils/fields';
+
+import appMessages from 'containers/App/messages';
 import messages from './messages';
+import { selectViewEntity } from './selectors';
+import { DEPENDENCIES } from './constants';
 
 export class PageView extends React.PureComponent { // eslint-disable-line react/prefer-stateless-function
 
@@ -38,103 +49,79 @@ export class PageView extends React.PureComponent { // eslint-disable-line react
     }
   }
 
+  getHeaderMainFields = (entity) => ([{
+    fields: [getTitleField(entity, true)],
+  }]);
+  getHeaderAsideFields = (entity) => ([{
+    fields: [
+      getStatusField(entity),
+      getMetaField(entity, appMessages),
+    ],
+  }]);
+  getBodyMainFields = (entity) => ([{
+    fields: [getMarkdownField(entity, 'content', true, appMessages)],
+  }]);
+
+  getFields = (entity, isContributor) => ({
+    header: isContributor
+      ? {
+        main: this.getHeaderMainFields(entity),
+        aside: this.getHeaderAsideFields(entity),
+      }
+      : null,
+    body: {
+      main: this.getBodyMainFields(entity),
+    },
+  })
+
+
   render() {
     const { page, dataReady, isAdmin, isContributor } = this.props;
-    const reference = this.props.params.id;
-    const status = page && find(PUBLISH_STATUSES, { value: page.attributes.draft });
 
-    let asideFields = page && [{
-      id: 'number',
-      heading: 'Number',
-      value: reference,
-    }];
-    if (page && isContributor) {
-      asideFields = asideFields.concat([
-        {
-          id: 'status',
-          heading: 'Status',
-          value: status && status.label,
-        },
-        {
-          id: 'updated',
-          heading: 'Updated At',
-          value: page.attributes.updated_at,
-        },
-        {
-          id: 'updated_by',
-          heading: 'Updated By',
-          value: page.user && page.user.attributes.name,
-        },
-      ]);
-    }
-    const pageActions = isAdmin
+    const buttons = isAdmin
     ? [
       {
-        type: 'simple',
-        title: 'Edit',
+        type: 'edit',
         onClick: this.props.handleEdit,
       },
       {
-        type: 'primary',
-        title: 'Close',
+        type: 'close',
         onClick: this.props.handleClose,
       },
     ]
     : [{
-      type: 'primary',
-      title: 'Close',
+      type: 'close',
       onClick: this.props.handleClose,
     }];
 
     return (
       <div>
         <Helmet
-          title={page ? page.attributes.title : `${this.context.intl.formatMessage(messages.pageTitle)}: ${reference}`}
+          title={page ? page.getIn(['attributes', 'title']) : `${this.context.intl.formatMessage(messages.pageTitle)}: ${this.props.params.id}`}
           meta={[
             { name: 'description', content: this.context.intl.formatMessage(messages.metaDescription) },
           ]}
         />
-        <Page
-          title={page ? page.attributes.title : this.context.intl.formatMessage(messages.loading)}
-          actions={pageActions}
-        >
+        <Content>
+          <ContentHeader
+            title={page ? page.getIn(['attributes', 'title']) : ''}
+            type={CONTENT_SINGLE}
+            buttons={buttons}
+          />
           { !page && !dataReady &&
-            <div>
-              <FormattedMessage {...messages.loading} />
-            </div>
+            <Loading />
           }
           { !page && dataReady &&
             <div>
               <FormattedMessage {...messages.notFound} />
             </div>
           }
-          { page &&
+          { page && dataReady &&
             <EntityView
-              fields={{
-                header: isAdmin ? {
-                  main: [
-                    {
-                      id: 'menu_title',
-                      heading: 'Menu title',
-                      value: page.attributes.menu_title,
-                    },
-                  ],
-                  aside: asideFields,
-                } : null,
-                body: {
-                  main: [
-                    {
-                      id: 'content',
-                      heading: isAdmin ? 'Content' : '',
-                      value: page.attributes.content,
-                    },
-                  ],
-                  aside: [],
-                },
-              }}
+              fields={this.getFields(page, isContributor)}
             />
           }
-        </Page>
+        </Content>
       </div>
     );
   }
@@ -152,49 +139,27 @@ PageView.propTypes = {
 };
 
 PageView.contextTypes = {
-  intl: React.PropTypes.object.isRequired,
+  intl: PropTypes.object.isRequired,
 };
 
 
 const mapStateToProps = (state, props) => ({
-  isAdmin: isUserAdmin(state),
-  isContributor: isUserContributor(state),
-  dataReady: isReady(state, { path: [
-    'pages',
-    'users',
-    'user_roles',
-  ] }),
-  page: getEntity(
-    state,
-    {
-      id: props.params.id,
-      path: 'pages',
-      out: 'js',
-      extend: [
-        {
-          type: 'single',
-          path: 'users',
-          key: 'last_modified_user_id',
-          as: 'user',
-        },
-      ],
-    },
-  ),
+  isAdmin: selectIsUserAdmin(state),
+  isContributor: selectIsUserContributor(state),
+  dataReady: selectReady(state, { path: DEPENDENCIES }),
+  page: selectViewEntity(state, props.params.id),
 });
 
 function mapDispatchToProps(dispatch, props) {
   return {
     loadEntitiesIfNeeded: () => {
-      dispatch(loadEntitiesIfNeeded('users'));
-      dispatch(loadEntitiesIfNeeded('user_roles'));
-      dispatch(loadEntitiesIfNeeded('pages'));
+      DEPENDENCIES.forEach((path) => dispatch(loadEntitiesIfNeeded(path)));
     },
     handleEdit: () => {
       dispatch(updatePath(`/pages/edit/${props.params.id}`));
     },
     handleClose: () => {
-      dispatch(updatePath('/pages'));
-      // TODO should be "go back" if history present or to pages list when not
+      dispatch(closeEntity('/pages'));
     },
   };
 }

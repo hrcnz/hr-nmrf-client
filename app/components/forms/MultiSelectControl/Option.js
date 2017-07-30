@@ -1,26 +1,35 @@
-import React, { PropTypes } from 'react';
+import React from 'react';
+import PropTypes from 'prop-types';
 import styled from 'styled-components';
+import { palette } from 'styled-theme';
 
-const Label = styled.span`
+const Label = styled.div`
   font-weight: ${(props) => props.bold ? 'bold' : 'normal'};
-  padding-left: 10px;
-`;
-const Reference = styled.span`
-  font-weight: bold;
-  opacity: 0.5;
-  font-size: 0.8em;
-  padding-right: 10px;
+  padding-left: 1em;
+  position: relative;
 `;
 const Count = styled.span`
-  float: right;
+  position: absolute;
+  top: 0;
+  right: 0;
+  color: ${palette('dark', 4)};
 `;
-
+const Id = styled.span`
+  font-weight: bold;
+  color: ${palette('dark', 3)}
+`;
+const IdSpacer = styled.span`
+  padding-left: 0.5em;
+  padding-right: 0.5em;
+  color: ${palette('dark', 1)};
+`;
 const Option = (props) => (
   <Label bold={props.bold}>
-    { props.reference &&
-      <Reference>
-        {props.reference}
-      </Reference>
+    {props.reference &&
+      <Id>{props.reference}</Id>
+    }
+    {props.reference &&
+      <IdSpacer>|</IdSpacer>
     }
     {props.label}
     { typeof props.count !== 'undefined' &&

@@ -1,4 +1,5 @@
-import React, { PropTypes } from 'react';
+import React from 'react';
+import PropTypes from 'prop-types';
 import { FormattedMessage } from 'react-intl';
 import styled from 'styled-components';
 import { palette } from 'styled-theme';
@@ -13,12 +14,12 @@ const Styled = styled(Button)`
   padding: 1em;
   width: 100%;
   max-width: 300px;
-  background-color: ${palette('primary', 4)};
   margin-bottom:${(props) => 2 * props.theme.gutter}px;
-  color: ${palette('greyscaleDark', 2)};
   box-shadow: 0px 0px 1px 0px rgba(0,0,0,0.2);
+  color: ${palette('dark', 2)};
+  background-color: ${palette('primary', 4)};
   &:hover {
-    color: ${palette('greyscaleDark', 0)};
+    color: ${palette('dark', 0)};
     box-shadow: 0px 0px 3px 0px rgba(0,0,0,0.2);
   }
 `;
@@ -37,9 +38,8 @@ const TaxGraphic = styled.div`
   padding-top: 100%;
   height: 0;
   border-radius:999px;
-  background-color: ${palette('secondary', 0)};
+  background-color: ${palette('primary', 2)};
   color: ${palette('primary', 4)};
-
 `;
 const TaxIcon = styled.div`
   position: absolute;
@@ -57,14 +57,14 @@ const TaxTitle = styled.span`
 const TaxTagging = styled.div`
   padding: 2em 0 1em;
   font-size: 0.85em;
-  color: ${palette('greyscaleLight', 4)};
+  color: ${palette('light', 4)};
 `;
 const TaxTaggingIcons = styled.div`
 `;
 const TaxTaggingIcon = styled.span`
-  color: ${palette('greyscaleLight', 4)};
+  color: ${palette('light', 4)};
   border-right: 1px solid;
-  border-color: ${(props) => props.last ? 'transparent' : palette('greyscaleLight', 4)};
+  border-color: ${(props) => props.last ? 'transparent' : palette('light', 4)};
 `;
 
 

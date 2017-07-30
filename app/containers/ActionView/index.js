@@ -4,27 +4,57 @@
  *
  */
 
-import React, { PropTypes } from 'react';
+import React from 'react';
+import PropTypes from 'prop-types';
 import { connect } from 'react-redux';
 import Helmet from 'react-helmet';
 import { FormattedMessage } from 'react-intl';
-import { find } from 'lodash/collection';
-
-import { loadEntitiesIfNeeded, updatePath } from 'containers/App/actions';
-
-import { PUBLISH_STATUSES } from 'containers/App/constants';
-
-import Page from 'components/Page';
-import EntityView from 'components/views/EntityView';
 
 import {
-  getEntity,
-  getEntities,
-  isReady,
-  isUserManager,
+  getIdField,
+  getTitleField,
+  getTextField,
+  getStatusField,
+  getMetaField,
+  getMarkdownField,
+  getDateField,
+  getIndicatorConnectionField,
+  getRecommendationConnectionField,
+  getSdgTargetConnectionField,
+  getTaxonomyFields,
+} from 'utils/fields';
+
+import { loadEntitiesIfNeeded, updatePath, closeEntity } from 'containers/App/actions';
+
+import { CONTENT_SINGLE } from 'containers/App/constants';
+
+import Loading from 'components/Loading';
+import Content from 'components/Content';
+import ContentHeader from 'components/ContentHeader';
+import EntityView from 'components/EntityView';
+
+import {
+  selectReady,
+  selectIsUserManager,
+  selectRecommendationTaxonomies,
+  selectSdgTargetTaxonomies,
+  selectRecommendationConnections,
+  selectSdgTargetConnections,
+  selectIndicatorConnections,
 } from 'containers/App/selectors';
 
+import appMessages from 'containers/App/messages';
 import messages from './messages';
+
+import {
+  selectViewEntity,
+  selectTaxonomies,
+  selectRecommendations,
+  selectIndicators,
+  selectSdgTargets,
+} from './selectors';
+
+import { DEPENDENCIES } from './constants';
 
 export class ActionView extends React.PureComponent { // eslint-disable-line react/prefer-stateless-function
 
@@ -37,143 +67,153 @@ export class ActionView extends React.PureComponent { // eslint-disable-line rea
       this.props.loadEntitiesIfNeeded();
     }
   }
+  getHeaderMainFields = (entity, isManager) => ([ // fieldGroups
+    { // fieldGroup
+      fields: [
+        getIdField(entity),
+        getTitleField(entity, isManager),
+      ],
+    },
+  ]);
+  getHeaderAsideFields = (entity) => ([
+    {
+      fields: [
+        getStatusField(entity),
+        getMetaField(entity, appMessages),
+      ],
+    },
+  ]);
+  getBodyMainFields = (
+    entity,
+    recommendations,
+    indicators,
+    recTaxonomies,
+    sdgtargets,
+    sdgtargetTaxonomies,
+    onEntityClick,
+    recConnections,
+    indicatorConnections,
+    sdgtargetConnections,
+  ) => ([
+    {
+      fields: [
+        getMarkdownField(entity, 'description', true, appMessages),
+        getMarkdownField(entity, 'outcome', true, appMessages),
+        getMarkdownField(entity, 'indicator_summary', true, appMessages),
+      ],
+    },
+    {
+      label: appMessages.entities.connections.plural,
+      icon: 'connections',
+      fields: [
+        getIndicatorConnectionField(indicators, indicatorConnections, appMessages, onEntityClick),
+        getRecommendationConnectionField(recommendations, recTaxonomies, recConnections, appMessages, onEntityClick),
+        getSdgTargetConnectionField(sdgtargets, sdgtargetTaxonomies, sdgtargetConnections, appMessages, onEntityClick),
+      ],
+    },
+  ]);
 
-  mapIndicators = (indicators) =>
-    Object.values(indicators).map((indicator) => ({
-      label: indicator.attributes.title,
-      linkTo: `/indicators/${indicator.id}`,
-    }))
+  getBodyAsideFields = (entity, taxonomies) => ([
+    // fieldGroup
+    {
+      type: 'dark',
+      fields: [
+        getDateField(entity, 'target_date', appMessages, true),
+        getTextField(entity, 'target_date_comment', appMessages),
+      ],
+    },
+    { // fieldGroup
+      label: appMessages.entities.taxonomies.plural,
+      icon: 'categories',
+      fields: getTaxonomyFields(taxonomies, appMessages),
+    },
+  ]);
 
-  mapRecommendations = (recommendations) =>
-    Object.values(recommendations).map((recommendation) => ({
-      label: recommendation.attributes.title,
-      linkTo: `/recommendations/${recommendation.id}`,
-    }))
-
-  mapCategoryOptions = (categories) => categories
-    ? Object.values(categories).map((cat) => ({
-      label: cat.attributes.title,
-      linkTo: `/category/${cat.id}`,
-    }))
-    : []
-
-  renderTaxonomyLists = (taxonomies) =>
-    Object.values(taxonomies).map((taxonomy) => ({
-      id: taxonomy.id,
-      heading: taxonomy.attributes.title,
-      type: 'list',
-      values: this.mapCategoryOptions(taxonomy.categories),
-    }))
 
   render() {
-    const { action, dataReady, isManager } = this.props;
-    const reference = this.props.params.id;
-    const status = action && find(PUBLISH_STATUSES, { value: action.attributes.draft });
-
-    let asideFields = action && [{
-      id: 'number',
-      heading: 'Number',
-      value: reference,
-    }];
-    if (action && isManager) {
-      asideFields = asideFields.concat([
-        {
-          id: 'status',
-          heading: 'Status',
-          value: status && status.label,
-        },
-        {
-          id: 'updated',
-          heading: 'Updated At',
-          value: action.attributes.updated_at,
-        },
-        {
-          id: 'updated_by',
-          heading: 'Updated By',
-          value: action.user && action.user.attributes.name,
-        },
-      ]);
-    }
-
-    const pageActions = isManager
+    const {
+      viewEntity,
+      dataReady,
+      isManager,
+      recommendations,
+      indicators,
+      taxonomies,
+      recTaxonomies,
+      sdgtargets,
+      sdgtargetTaxonomies,
+      onEntityClick,
+      recConnections,
+      sdgtargetConnections,
+      indicatorConnections,
+    } = this.props;
+    // viewEntity && console.log(viewEntity.toJS())
+    // indicators && console.log(indicators.toJS())
+    // console.log('ActionView.render', dataReady)
+    const buttons = isManager
     ? [
       {
-        type: 'simple',
-        title: 'Edit',
+        type: 'edit',
         onClick: () => this.props.handleEdit(this.props.params.id),
       },
       {
-        type: 'primary',
-        title: 'Close',
+        type: 'close',
         onClick: this.props.handleClose,
       },
     ]
     : [{
-      type: 'primary',
-      title: 'Close',
+      type: 'close',
       onClick: this.props.handleClose,
     }];
 
     return (
       <div>
         <Helmet
-          title={`${this.context.intl.formatMessage(messages.pageTitle)}: ${reference}`}
+          title={`${this.context.intl.formatMessage(messages.pageTitle)}: ${this.props.params.id}`}
           meta={[
             { name: 'description', content: this.context.intl.formatMessage(messages.metaDescription) },
           ]}
         />
-        <Page
-          title={this.context.intl.formatMessage(messages.pageTitle)}
-          actions={pageActions}
-        >
-          { !action && !dataReady &&
-            <div>
-              <FormattedMessage {...messages.loading} />
-            </div>
+        <Content>
+          <ContentHeader
+            title={this.context.intl.formatMessage(messages.pageTitle)}
+            type={CONTENT_SINGLE}
+            icon="measures"
+            buttons={buttons}
+          />
+          { !dataReady &&
+            <Loading />
           }
-          { !action && dataReady &&
+          { !viewEntity && dataReady &&
             <div>
               <FormattedMessage {...messages.notFound} />
             </div>
           }
-          { action && dataReady &&
+          { viewEntity && dataReady &&
             <EntityView
               fields={{
                 header: {
-                  main: [
-                    {
-                      id: 'title',
-                      value: action.attributes.title,
-                    },
-                  ],
-                  aside: asideFields,
+                  main: this.getHeaderMainFields(viewEntity, isManager),
+                  aside: isManager ? this.getHeaderAsideFields(viewEntity) : null,
                 },
                 body: {
-                  main: [
-                    {
-                      id: 'description',
-                      heading: 'Description',
-                      value: action.attributes.description,
-                    },
-                    {
-                      id: 'recommendations',
-                      heading: 'Recommendations',
-                      type: 'list',
-                      values: this.mapRecommendations(this.props.recommendations),
-                    },
-                    {
-                      id: 'indicators',
-                      heading: 'Indicators',
-                      type: 'list',
-                      values: this.mapIndicators(this.props.indicators),
-                    },
-                  ],
-                  aside: this.renderTaxonomyLists(this.props.taxonomies),
+                  main: this.getBodyMainFields(
+                    viewEntity,
+                    recommendations,
+                    indicators,
+                    recTaxonomies,
+                    sdgtargets,
+                    sdgtargetTaxonomies,
+                    onEntityClick,
+                    recConnections,
+                    indicatorConnections,
+                    sdgtargetConnections,
+                  ),
+                  aside: this.getBodyAsideFields(viewEntity, taxonomies),
                 },
               }}
             />
           }
-        </Page>
+        </Content>
       </div>
     );
   }
@@ -183,120 +223,55 @@ ActionView.propTypes = {
   loadEntitiesIfNeeded: PropTypes.func,
   handleEdit: PropTypes.func,
   handleClose: PropTypes.func,
-  action: PropTypes.object,
+  onEntityClick: PropTypes.func,
+  viewEntity: PropTypes.object,
   dataReady: PropTypes.bool,
   isManager: PropTypes.bool,
   taxonomies: PropTypes.object,
+  recTaxonomies: PropTypes.object,
   recommendations: PropTypes.object,
   indicators: PropTypes.object,
+  sdgtargets: PropTypes.object,
+  sdgtargetTaxonomies: PropTypes.object,
+  recConnections: PropTypes.object,
+  sdgtargetConnections: PropTypes.object,
+  indicatorConnections: PropTypes.object,
   params: PropTypes.object,
 };
 
 ActionView.contextTypes = {
-  intl: React.PropTypes.object.isRequired,
+  intl: PropTypes.object.isRequired,
 };
 
 
 const mapStateToProps = (state, props) => ({
-  isManager: isUserManager(state),
-  dataReady: isReady(state, { path: [
-    'measures',
-    'users',
-    'taxonomies',
-    'categories',
-    'recommendations',
-    'recommendation_measures',
-    'measure_categories',
-    'indicators',
-    'measure_indicators',
-  ] }),
-  action: getEntity(
-    state,
-    {
-      id: props.params.id,
-      path: 'measures',
-      out: 'js',
-      extend: {
-        type: 'single',
-        path: 'users',
-        key: 'last_modified_user_id',
-        as: 'user',
-      },
-    },
-  ),
-  // all connected categories for all action-taggable taxonomies
-  taxonomies: getEntities(
-    state,
-    {
-      path: 'taxonomies',
-      where: {
-        tags_measures: true,
-      },
-      extend: {
-        path: 'categories',
-        key: 'taxonomy_id',
-        reverse: true,
-        connected: {
-          path: 'measure_categories',
-          key: 'category_id',
-          where: {
-            measure_id: props.params.id,
-          },
-        },
-      },
-      out: 'js',
-    },
-  ),
-  // all connected recommendations
-  recommendations: getEntities(
-    state, {
-      path: 'recommendations',
-      out: 'js',
-      connected: {
-        path: 'recommendation_measures',
-        key: 'recommendation_id',
-        where: {
-          measure_id: props.params.id,
-        },
-      },
-    },
-  ),
-  // all connected indicators
-  indicators: getEntities(
-    state, {
-      path: 'indicators',
-      out: 'js',
-      connected: {
-        path: 'measure_indicators',
-        key: 'indicator_id',
-        where: {
-          measure_id: props.params.id,
-        },
-      },
-    },
-  ),
+  isManager: selectIsUserManager(state),
+  dataReady: selectReady(state, { path: DEPENDENCIES }),
+  viewEntity: selectViewEntity(state, props.params.id),
+  taxonomies: selectTaxonomies(state, props.params.id),
+  sdgtargets: selectSdgTargets(state, props.params.id),
+  indicators: selectIndicators(state, props.params.id),
+  recommendations: selectRecommendations(state, props.params.id),
+  recTaxonomies: selectRecommendationTaxonomies(state),
+  sdgtargetTaxonomies: selectSdgTargetTaxonomies(state),
+  recConnections: selectRecommendationConnections(state),
+  sdgtargetConnections: selectSdgTargetConnections(state),
+  indicatorConnections: selectIndicatorConnections(state),
 });
 
 function mapDispatchToProps(dispatch) {
   return {
     loadEntitiesIfNeeded: () => {
-      dispatch(loadEntitiesIfNeeded('measures'));
-      dispatch(loadEntitiesIfNeeded('users'));
-      dispatch(loadEntitiesIfNeeded('taxonomies'));
-      dispatch(loadEntitiesIfNeeded('categories'));
-      dispatch(loadEntitiesIfNeeded('measure_categories'));
-      dispatch(loadEntitiesIfNeeded('recommendations'));
-      dispatch(loadEntitiesIfNeeded('recommendation_measures'));
-      dispatch(loadEntitiesIfNeeded('indicators'));
-      dispatch(loadEntitiesIfNeeded('measure_indicators'));
-      dispatch(loadEntitiesIfNeeded('user_roles'));
+      DEPENDENCIES.forEach((path) => dispatch(loadEntitiesIfNeeded(path)));
     },
-    handleEdit: (actionId) => {
-      dispatch(updatePath(`/actions/edit/${actionId}`));
+    onEntityClick: (id, path) => {
+      dispatch(updatePath(`/${path}/${id}`));
+    },
+    handleEdit: (measureId) => {
+      dispatch(updatePath(`/actions/edit/${measureId}`));
     },
     handleClose: () => {
-      dispatch(updatePath('/actions'));
-      // TODO should be "go back" if history present or to actions list when not
+      dispatch(closeEntity('/actions'));
     },
   };
 }

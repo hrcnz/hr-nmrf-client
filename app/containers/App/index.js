@@ -4,25 +4,28 @@
  *
  */
 
-import React, { PropTypes } from 'react';
+import React from 'react';
+import PropTypes from 'prop-types';
 import { connect } from 'react-redux';
-import styled from 'styled-components';
+import Perf from 'react-addons-perf';
 
+import styled from 'styled-components';
 import Header from 'components/Header';
 import {
-  isSignedIn,
-  getSessionUserId,
-  isUserManager,
-  isReady,
-  getEntities,
+  selectIsSignedIn,
+  selectIsUserManager,
+  selectSessionUserId,
+  selectReady,
+  selectEntitiesWhere,
 } from './selectors';
 import { validateToken, loadEntitiesIfNeeded, updatePath } from './actions';
+import { DEPENDENCIES } from './constants';
 
 import messages from './messages';
 
 const Main = styled.div`
   position: ${(props) => props.isHome ? 'relative' : 'absolute'};
-  top: ${(props) => props.isHome ? 0 : '115px'};
+  top: ${(props) => props.isHome ? 0 : '150px'};
   overflow: ${(props) => props.isHome ? 'auto' : 'hidden'};
   left: 0;
   right: 0;
@@ -45,21 +48,22 @@ class App extends React.PureComponent { // eslint-disable-line react/prefer-stat
   }
 
   preparePageMenuPages = (pages) =>
-    Object.values(pages).map((page) => ({
-      path: `/pages/${page.id}`,
-      title: page.attributes.menu_title || page.attributes.title,
-    }));
+    pages.map((page) => ({
+      path: `/pages/${page.get('id')}`,
+      title: page.getIn(['attributes', 'menu_title']) || page.getIn(['attributes', 'title']),
+    })).toArray();
 
   prepareMainMenuItems = (isManager, currentPath) => {
     let navItems = ([
       {
+        path: '/overview',
+        title: this.context.intl.formatMessage(messages.overview),
+        active: currentPath.startsWith('/overview'),
+      },
+      {
         path: '/categories',
         title: this.context.intl.formatMessage(messages.entities.taxonomies.plural),
         active: currentPath.startsWith('/category'),
-      },
-      {
-        path: '/recommendations',
-        title: this.context.intl.formatMessage(messages.entities.recommendations.plural),
       },
       {
         path: '/actions',
@@ -69,6 +73,14 @@ class App extends React.PureComponent { // eslint-disable-line react/prefer-stat
         path: '/indicators',
         title: this.context.intl.formatMessage(messages.entities.indicators.plural),
         active: currentPath.startsWith('/reports'),
+      },
+      {
+        path: '/recommendations',
+        title: this.context.intl.formatMessage(messages.entities.recommendations.plural),
+      },
+      {
+        path: '/sdgtargets',
+        title: this.context.intl.formatMessage(messages.entities.sdgtargets.plural),
       },
     ]);
     if (isManager) {
@@ -87,6 +99,7 @@ class App extends React.PureComponent { // eslint-disable-line react/prefer-stat
   }
 
   render() {
+    window.Perf = Perf;
     const { pages, onPageLink, isUserSignedIn, isManager, location } = this.props;
     return (
       <div>
@@ -123,21 +136,14 @@ App.contextTypes = {
 };
 
 const mapStateToProps = (state) => ({
-  dataReady: isReady(state, { path: [
-    'user_roles',
-    'pages',
-  ] }),
-  isManager: isUserManager(state),
-  isUserSignedIn: isSignedIn(state),
-  userId: getSessionUserId(state),
-  pages: getEntities(
-    state,
-    {
-      path: 'pages',
-      where: { draft: false },
-      out: 'js',
-    },
-  ),
+  dataReady: selectReady(state, { path: DEPENDENCIES }),
+  isManager: selectIsUserManager(state),
+  isUserSignedIn: selectIsSignedIn(state),
+  userId: selectSessionUserId(state),
+  pages: selectEntitiesWhere(state, {
+    path: 'pages',
+    where: { draft: false },
+  }),
 });
 
 export function mapDispatchToProps(dispatch) {
@@ -146,8 +152,7 @@ export function mapDispatchToProps(dispatch) {
       dispatch(validateToken()); // Maybe this could move to routes.js or App wrapper
     },
     loadEntitiesIfNeeded: () => {
-      dispatch(loadEntitiesIfNeeded('pages'));
-      dispatch(loadEntitiesIfNeeded('user_roles'));
+      DEPENDENCIES.forEach((path) => dispatch(loadEntitiesIfNeeded(path)));
     },
     onPageLink: (path) => {
       dispatch(updatePath(path));

@@ -4,16 +4,27 @@
 *
 */
 
-import React, { PropTypes } from 'react';
+import React from 'react';
+import PropTypes from 'prop-types';
 import { connect } from 'react-redux';
 import Helmet from 'react-helmet';
-import { FormattedMessage } from 'react-intl';
 
 import { Map, List } from 'immutable';
 
+import {
+  renderMeasureControl,
+  renderTaxonomyControl,
+  getTitleFormField,
+  getReferenceFormField,
+  getAcceptedField,
+  getStatusField,
+  getMarkdownField,
+} from 'utils/forms';
+
 import { getCheckedValuesFromOptions } from 'components/forms/MultiSelectControl';
 
-import { PUBLISH_STATUSES, USER_ROLES } from 'containers/App/constants';
+import { USER_ROLES, CONTENT_SINGLE } from 'containers/App/constants';
+import appMessages from 'containers/App/messages';
 
 import {
   loadEntitiesIfNeeded,
@@ -22,20 +33,21 @@ import {
   updateEntityForm,
 } from 'containers/App/actions';
 
+import { selectEntities, selectReady } from 'containers/App/selectors';
 
-import Page from 'components/Page';
+import Loading from 'components/Loading';
+import Content from 'components/Content';
+import ContentHeader from 'components/ContentHeader';
 import EntityForm from 'components/forms/EntityForm';
 
-import { getEntities, isReady } from 'containers/App/selectors';
-
 import {
-  renderActionControl,
-  renderTaxonomyControl,
-} from 'utils/forms';
+  selectDomain,
+  selectTaxonomies,
+} from './selectors';
 
-import viewDomainSelect from './selectors';
 import messages from './messages';
 import { save } from './actions';
+import { DEPENDENCIES } from './constants';
 
 
 export class RecommendationNew extends React.PureComponent { // eslint-disable-line react/prefer-stateless-function
@@ -54,10 +66,46 @@ export class RecommendationNew extends React.PureComponent { // eslint-disable-l
     }
   }
 
+  getHeaderMainFields = () => ([ // fieldGroups
+    { // fieldGroup
+      fields: [
+        getReferenceFormField(this.context.intl.formatMessage, appMessages, true), // required
+        getTitleFormField(this.context.intl.formatMessage, appMessages, 'titleText'),
+      ],
+    },
+  ]);
+
+  getHeaderAsideFields = () => ([{
+    fields: [getStatusField(this.context.intl.formatMessage, appMessages)],
+  }]);
+
+  getBodyMainFields = (measures) => ([
+    {
+      fields: [
+        getAcceptedField(this.context.intl.formatMessage, appMessages),
+        getMarkdownField(this.context.intl.formatMessage, appMessages, 'response'),
+      ],
+    },
+    {
+      label: this.context.intl.formatMessage(appMessages.entities.connections.plural),
+      icon: 'connections',
+      fields: [
+        renderMeasureControl(measures),
+      ],
+    },
+  ]);
+
+  getBodyAsideFields = (taxonomies) => ([ // fieldGroups
+    { // fieldGroup
+      label: this.context.intl.formatMessage(appMessages.entities.taxonomies.plural),
+      icon: 'categories',
+      fields: renderTaxonomyControl(taxonomies),
+    },
+  ]);
+
   render() {
-    const { dataReady, viewDomain } = this.props;
+    const { dataReady, viewDomain, taxonomies, measures } = this.props;
     const { saveSending, saveError } = viewDomain.page;
-    const required = (val) => val && val.length;
 
     return (
       <div>
@@ -70,83 +118,53 @@ export class RecommendationNew extends React.PureComponent { // eslint-disable-l
             },
           ]}
         />
-        { !dataReady &&
-          <div>
-            <FormattedMessage {...messages.loading} />
-          </div>
-        }
-        {dataReady &&
-          <Page
+        <Content>
+          <ContentHeader
             title={this.context.intl.formatMessage(messages.pageTitle)}
-            actions={
-              [
-                {
-                  type: 'simple',
-                  title: 'Cancel',
-                  onClick: this.props.handleCancel,
-                },
-                {
-                  type: 'primary',
-                  title: 'Save',
-                  onClick: () => this.props.handleSubmit(
-                    viewDomain.form.data
-                  ),
-                },
-              ]
+            type={CONTENT_SINGLE}
+            icon="recommendations"
+            buttons={
+              dataReady ? [{
+                type: 'cancel',
+                onClick: this.props.handleCancel,
+              },
+              {
+                type: 'save',
+                onClick: () => this.props.handleSubmit(
+                  viewDomain.form.data,
+                ),
+              }] : null
             }
-          >
-            {saveSending &&
-              <p>Saving Recommendation</p>
-            }
-            {saveError &&
-              <p>{saveError}</p>
-            }
+          />
+          { !dataReady &&
+            <Loading />
+          }
+          {saveSending &&
+            <Loading />
+          }
+          {saveError &&
+            <p>{saveError}</p>
+          }
+          {dataReady &&
             <EntityForm
               model="recommendationNew.form.data"
               formData={viewDomain.form.data}
               handleSubmit={(formData) => this.props.handleSubmit(formData)}
               handleCancel={this.props.handleCancel}
               handleUpdate={this.props.handleUpdate}
-              fields={{
+              fields={{ // isManager, taxonomies,
                 header: {
-                  main: [
-                    {
-                      id: 'title',
-                      controlType: 'input',
-                      model: '.attributes.title',
-                      placeholder: this.context.intl.formatMessage(messages.fields.title.placeholder),
-                      validators: {
-                        required,
-                      },
-                      errorMessages: {
-                        required: this.context.intl.formatMessage(messages.fieldRequired),
-                      },
-                    },
-                  ],
-                  aside: [
-                    {
-                      id: 'number',
-                      controlType: 'input',
-                      model: '.attributes.number',
-                    },
-                    {
-                      id: 'status',
-                      controlType: 'select',
-                      model: '.attributes.draft',
-                      options: PUBLISH_STATUSES,
-                    },
-                  ],
+                  main: this.getHeaderMainFields(),
+                  aside: this.getHeaderAsideFields(),
                 },
                 body: {
-                  main: [
-                    renderActionControl(this.props.actions),
-                  ],
-                  aside: renderTaxonomyControl(this.props.taxonomies),
+                  main: this.getBodyMainFields(measures),
+                  aside: this.getBodyAsideFields(taxonomies),
                 },
               }}
             />
-          </Page>
-        }
+          }
+        </Content>
       </div>
     );
   }
@@ -161,47 +179,24 @@ RecommendationNew.propTypes = {
   viewDomain: PropTypes.object,
   dataReady: PropTypes.bool,
   taxonomies: PropTypes.object,
-  actions: PropTypes.object,
+  measures: PropTypes.object,
 };
 
 RecommendationNew.contextTypes = {
-  intl: React.PropTypes.object.isRequired,
+  intl: PropTypes.object.isRequired,
 };
 
 const mapStateToProps = (state) => ({
-  viewDomain: viewDomainSelect(state),
-  dataReady: isReady(state, { path: [
-    'categories',
-    'taxonomies',
-    'measures',
-  ] }),
-  taxonomies: getEntities(
-    state,
-    {
-      path: 'taxonomies',
-      where: {
-        tags_recommendations: true,
-      },
-      extend: {
-        path: 'categories',
-        key: 'taxonomy_id',
-        reverse: true,
-      },
-    },
-  ),
-  actions: getEntities(
-    state, {
-      path: 'measures',
-    },
-  ),
+  viewDomain: selectDomain(state),
+  dataReady: selectReady(state, { path: DEPENDENCIES }),
+  taxonomies: selectTaxonomies(state),
+  measures: selectEntities(state, 'measures'),
 });
 
 function mapDispatchToProps(dispatch) {
   return {
     loadEntitiesIfNeeded: () => {
-      dispatch(loadEntitiesIfNeeded('categories'));
-      dispatch(loadEntitiesIfNeeded('taxonomies'));
-      dispatch(loadEntitiesIfNeeded('measures'));
+      DEPENDENCIES.forEach((path) => dispatch(loadEntitiesIfNeeded(path)));
     },
     redirectIfNotPermitted: () => {
       dispatch(redirectIfNotPermitted(USER_ROLES.MANAGER));
@@ -224,11 +219,11 @@ function mapDispatchToProps(dispatch) {
         );
       }
 
-      // actions
-      if (formData.get('associatedActions')) {
+      // measures
+      if (formData.get('associatedMeasures')) {
         saveData = saveData.set('recommendationMeasures', Map({
           delete: List(),
-          create: getCheckedValuesFromOptions(formData.get('associatedActions'))
+          create: getCheckedValuesFromOptions(formData.get('associatedMeasures'))
           .map((id) => Map({
             measure_id: id,
           })),

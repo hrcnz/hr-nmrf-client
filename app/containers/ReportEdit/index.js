@@ -4,51 +4,61 @@
  *
  */
 
-import React, { PropTypes } from 'react';
+import React from 'react';
+import PropTypes from 'prop-types';
 import { connect } from 'react-redux';
 import Helmet from 'react-helmet';
 import { FormattedMessage } from 'react-intl';
 import { actions as formActions } from 'react-redux-form/immutable';
 
-import { fromJS, List, Map } from 'immutable';
+import { Map } from 'immutable';
 
 import {
-  getCheckedValuesFromOptions,
-  getUncheckedValuesFromOptions,
-} from 'components/forms/MultiSelectControl';
+  getTitleFormField,
+  getDueDateOptionsField,
+  getDocumentStatusField,
+  getStatusField,
+  getMarkdownField,
+  getUploadField,
+} from 'utils/forms';
 
-import { DOC_PUBLISH_STATUSES, PUBLISH_STATUSES, USER_ROLES } from 'containers/App/constants';
+import {
+  getMetaField,
+} from 'utils/fields';
+
+import { USER_ROLES, CONTENT_SINGLE } from 'containers/App/constants';
+import appMessages from 'containers/App/messages';
 
 import {
   loadEntitiesIfNeeded,
   redirectIfNotPermitted,
   updatePath,
   updateEntityForm,
+  deleteEntity,
 } from 'containers/App/actions';
 
-import Page from 'components/Page';
+import { selectReady, selectIsUserAdmin } from 'containers/App/selectors';
+
+import Loading from 'components/Loading';
+import Content from 'components/Content';
+import ContentHeader from 'components/ContentHeader';
 import EntityForm from 'components/forms/EntityForm';
 
 import {
-  getEntity,
-  isReady,
-} from 'containers/App/selectors';
+  selectDomain,
+  selectViewEntity,
+} from './selectors';
 
-import {
-  dateOptions,
-  renderDateControl,
-} from 'utils/forms';
-
-import viewDomainSelect from './selectors';
 import messages from './messages';
 import { save } from './actions';
+import { DEPENDENCIES, FORM_INITIAL } from './constants';
 
 export class ReportEdit extends React.PureComponent { // eslint-disable-line react/prefer-stateless-function
 
   componentWillMount() {
     this.props.loadEntitiesIfNeeded();
 
-    if (this.props.dataReady && this.props.report) {
+    if (this.props.dataReady && this.props.viewEntity) {
       this.props.populateForm('reportEdit.form.data', this.getInitialFormData());
     }
   }
@@ -59,7 +69,7 @@ export class ReportEdit extends React.PureComponent { // eslint-disable-line rea
       this.props.loadEntitiesIfNeeded();
     }
 
-    if (nextProps.dataReady && !this.props.dataReady && nextProps.report) {
+    if (nextProps.dataReady && !this.props.dataReady && nextProps.viewEntity) {
       this.props.redirectIfNotPermitted();
       this.props.populateForm('reportEdit.form.data', this.getInitialFormData(nextProps));
     }
@@ -67,33 +77,74 @@ export class ReportEdit extends React.PureComponent { // eslint-disable-line rea
 
   getInitialFormData = (nextProps) => {
     const props = nextProps || this.props;
-    const { report } = props;
-    return Map({
-      id: report.id,
-      attributes: fromJS(report.attributes),
-      associatedDate: report && report.indicator && report.indicator.dates
-      ? dateOptions(fromJS(report.indicator.dates), report.attributes.due_date_id)
-      : List(),
-      // TODO allow single value for singleSelect
-    });
+    const { viewEntity } = props;
+    let attributes = viewEntity.get('attributes');
+    if (attributes.get('due_date_id')) {
+      attributes = attributes.set('due_date_id', attributes.get('due_date_id').toString());
+    }
+    return viewEntity
+    ? Map({
+      id: viewEntity.get('id'),
+      attributes: attributes.mergeWith(
+        (oldVal, newVal) => oldVal === null ? newVal : oldVal,
+        FORM_INITIAL.get('attributes')
+      ),
+    })
+    : Map();
   }
 
-  render() {
-    const { report, dataReady, viewDomain } = this.props;
-    const reference = this.props.params.id;
-    const { saveSending, saveError } = viewDomain.page;
-    const required = (val) => val && val.length;
+  getHeaderMainFields = () => ([ // fieldGroups
+    { // fieldGroup
+      fields: [
+        getTitleFormField(this.context.intl.formatMessage, appMessages),
+      ],
+    },
+  ]);
+  getHeaderAsideFields = (entity) => ([
+    {
+      fields: [
+        getStatusField(this.context.intl.formatMessage, appMessages, entity),
+        getMetaField(entity, appMessages),
+      ],
+    },
+  ]);
 
-    const dateControlOptions = report && report.indicator && report.indicator.dates
-      ? renderDateControl(fromJS(report.indicator.dates), report.attributes.due_date_id)
-      : null;
+  getBodyMainFields = (entity) => ([
+    {
+      fields: [
+        getMarkdownField(this.context.intl.formatMessage, appMessages),
+        getUploadField(this.context.intl.formatMessage, appMessages),
+        getDocumentStatusField(this.context.intl.formatMessage, appMessages, entity),
+      ],
+    },
+  ]);
+
+  getBodyAsideFields = (entity) => ([ // fieldGroups
+    { // fieldGroup
+      label: this.context.intl.formatMessage(appMessages.entities.due_dates.single),
+      icon: 'calendar',
+      fields: entity.get('indicator') && entity.getIn(['indicator', 'dates']) &&
+        [getDueDateOptionsField(
+          this.context.intl.formatMessage,
+          appMessages,
+          this.context.intl.formatDate,
+          entity.getIn(['indicator', 'dates']),
+          entity.getIn(['attributes', 'due_date_id'])
+            ? entity.getIn(['attributes', 'due_date_id']).toString()
+            : '0',
+        )],
+    },
+  ]);
+
+  render() {
+    const { viewEntity, dataReady, viewDomain } = this.props;
+    const reference = this.props.params.id;
+    const { saveSending, saveError, deleteSending, deleteError } = viewDomain.page;
 
     let pageTitle = this.context.intl.formatMessage(messages.pageTitle);
-
-    if (report) {
-      pageTitle = `${pageTitle} (Indicator: ${report.attributes.indicator_id})`;
+    if (viewEntity && dataReady) {
+      pageTitle = `${pageTitle} for indicator ${viewEntity.getIn(['attributes', 'indicator_id'])}`;
     }
-
     return (
       <div>
         <Helmet
@@ -102,109 +153,60 @@ export class ReportEdit extends React.PureComponent { // eslint-disable-line rea
             { name: 'description', content: this.context.intl.formatMessage(messages.metaDescription) },
           ]}
         />
-        { !report && !dataReady &&
-          <div>
-            <FormattedMessage {...messages.loading} />
-          </div>
-        }
-        { !report && dataReady && !saveError &&
-          <div>
-            <FormattedMessage {...messages.notFound} />
-          </div>
-        }
-        {report && dataReady &&
-          <Page
+        <Content>
+          <ContentHeader
             title={pageTitle}
-            actions={[
-              {
-                type: 'simple',
-                title: 'Cancel',
+            type={CONTENT_SINGLE}
+            icon="reports"
+            buttons={
+              viewEntity && dataReady ? [{
+                type: 'cancel',
                 onClick: () => this.props.handleCancel(reference),
               },
               {
-                type: 'primary',
-                title: 'Save',
-                onClick: () => this.props.handleSubmit(viewDomain.form.data),
-              },
-            ]}
-          >
-            {saveSending &&
-              <p>Saving</p>
+                type: 'save',
+                onClick: () => this.props.handleSubmit(viewDomain.form.data, viewEntity.getIn(['attributes', 'due_date_id'])),
+              }] : null
             }
-            {saveError &&
-              <p>{saveError}</p>
-            }
+          />
+          {(saveSending || deleteSending || !dataReady) &&
+            <Loading />
+          }
+          {deleteError &&
+            <p>{deleteError}</p>
+          }
+          {saveError &&
+            <p>{saveError}</p>
+          }
+          {!viewEntity && dataReady && !saveError && !deleteSending &&
+            <div>
+              <FormattedMessage {...messages.notFound} />
+            </div>
+          }
+          {viewEntity && dataReady && !deleteSending &&
             <EntityForm
               model="reportEdit.form.data"
               formData={viewDomain.form.data}
-              handleSubmit={(formData) => this.props.handleSubmit(formData)}
+              handleSubmit={(formData) => this.props.handleSubmit(formData, viewEntity.getIn(['attributes', 'due_date_id']))}
               handleCancel={() => this.props.handleCancel(reference)}
               handleUpdate={this.props.handleUpdate}
+              handleDelete={() => this.props.isUserAdmin
+                ? this.props.handleDelete(viewEntity.getIn(['attributes', 'indicator_id']))
+                : null
+              }
               fields={{
                 header: {
-                  main: [
-                    {
-                      id: 'title',
-                      controlType: 'input',
-                      model: '.attributes.title',
-                      validators: {
-                        required,
-                      },
-                      errorMessages: {
-                        required: this.context.intl.formatMessage(messages.fieldRequired),
-                      },
-                    },
-                  ],
-                  aside: [
-                    {
-                      id: 'no',
-                      controlType: 'info',
-                      displayValue: reference,
-                    },
-                    {
-                      id: 'status',
-                      controlType: 'select',
-                      model: '.attributes.draft',
-                      value: report.draft,
-                      options: PUBLISH_STATUSES,
-                    },
-                    {
-                      id: 'updated',
-                      controlType: 'info',
-                      displayValue: report.attributes.updated_at,
-                    },
-                    {
-                      id: 'updated_by',
-                      controlType: 'info',
-                      displayValue: report.user && report.user.attributes.name,
-                    },
-                  ],
+                  main: this.getHeaderMainFields(),
+                  aside: this.getHeaderAsideFields(viewEntity),
                 },
                 body: {
-                  main: [
-                    dateControlOptions,
-                    {
-                      id: 'description',
-                      controlType: 'textarea',
-                      model: '.attributes.description',
-                    },
-                    {
-                      id: 'document_url',
-                      controlType: 'uploader',
-                      model: '.attributes.document_url',
-                    },
-                    {
-                      id: 'document_public',
-                      controlType: 'select',
-                      model: '.attributes.document_public',
-                      options: DOC_PUBLISH_STATUSES,
-                    },
-                  ],
+                  main: this.getBodyMainFields(viewEntity),
+                  aside: this.getBodyAsideFields(viewEntity),
                 },
               }}
             />
-          </Page>
-        }
+          }
+        </Content>
       </div>
     );
   }
@@ -217,62 +219,26 @@ ReportEdit.propTypes = {
   handleSubmit: PropTypes.func.isRequired,
   handleCancel: PropTypes.func.isRequired,
   handleUpdate: PropTypes.func.isRequired,
+  handleDelete: PropTypes.func.isRequired,
   viewDomain: PropTypes.object,
-  report: PropTypes.object,
+  viewEntity: PropTypes.object,
   dataReady: PropTypes.bool,
+  isUserAdmin: PropTypes.bool,
   params: PropTypes.object,
 };
 
 ReportEdit.contextTypes = {
-  intl: React.PropTypes.object.isRequired,
+  intl: PropTypes.object.isRequired,
 };
 
 const mapStateToProps = (state, props) => ({
-  viewDomain: viewDomainSelect(state),
-  dataReady: isReady(state, { path: [
-    'progress_reports',
-    'users',
-    'due_dates',
-    'indicators',
-  ] }),
-  report: getEntity(
-    state,
-    {
-      id: props.params.id,
-      path: 'progress_reports',
-      out: 'js',
-      extend: [
-        {
-          type: 'single',
-          path: 'users',
-          key: 'last_modified_user_id',
-          as: 'user',
-        },
-        {
-          type: 'single',
-          path: 'indicators',
-          key: 'indicator_id',
-          as: 'indicator',
-          extend: {
-            path: 'due_dates',
-            key: 'indicator_id',
-            reverse: true,
-            as: 'dates',
-            extend: {
-              type: 'count',
-              path: 'progress_reports',
-              key: 'due_date_id',
-              reverse: true,
-              as: 'reportCount',
-            },
-          },
-        },
-      ],
-    },
-  ),
+  viewDomain: selectDomain(state),
+  isUserAdmin: selectIsUserAdmin(state),
+  dataReady: selectReady(state, { path: DEPENDENCIES }),
+  viewEntity: selectViewEntity(state, props.params.id),
 });
 
-function mapDispatchToProps(dispatch) {
+function mapDispatchToProps(dispatch, props) {
   return {
     loadEntitiesIfNeeded: () => {
       dispatch(loadEntitiesIfNeeded('users'));
@@ -284,31 +250,38 @@ function mapDispatchToProps(dispatch) {
       dispatch(redirectIfNotPermitted(USER_ROLES.CONTRIBUTOR));
     },
     populateForm: (model, formData) => {
-      dispatch(formActions.load(model, fromJS(formData)));
+      dispatch(formActions.load(model, formData));
     },
-    handleSubmit: (formData) => {
+    handleSubmit: (formData, previousDateAssigned) => {
       let saveData = formData;
-      let dueDateIdUnchecked = null;
 
-      // TODO: remove once have singleselect instead of multiselect
-      const formDateIds = getCheckedValuesFromOptions(formData.get('associatedDate'));
-      if (List.isList(formDateIds) && formDateIds.size) {
-        saveData = saveData.setIn(['attributes', 'due_date_id'], formDateIds.first());
-      } else {
-        saveData = saveData.setIn(['attributes', 'due_date_id'], null);
-      }
-      const uncheckedFormDateIds = getUncheckedValuesFromOptions(formData.get('associatedDate'));
-      if (List.isList(uncheckedFormDateIds) && uncheckedFormDateIds.size) {
-        dueDateIdUnchecked = uncheckedFormDateIds.first();
-      }
+      const dateAssigned = formData.getIn(['attributes', 'due_date_id']);
+      saveData = saveData.setIn(
+        ['attributes', 'due_date_id'],
+        dateAssigned === '0' || dateAssigned === 0
+        ? null
+        : parseInt(dateAssigned, 10)
+      );
 
-      dispatch(save(saveData.toJS(), dueDateIdUnchecked));
+      dispatch(save(
+        saveData.toJS(),
+        previousDateAssigned && previousDateAssigned !== dateAssigned
+          ? previousDateAssigned
+          : null
+      ));
     },
     handleCancel: (reference) => {
       dispatch(updatePath(`/reports/${reference}`));
     },
     handleUpdate: (formData) => {
       dispatch(updateEntityForm(formData));
+    },
+    handleDelete: (indicatorId) => {
+      dispatch(deleteEntity({
+        path: 'progress_reports',
+        id: props.params.id,
+        redirect: `indicators/${indicatorId}`,
+      }));
     },
   };
 }

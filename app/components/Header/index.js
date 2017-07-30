@@ -1,4 +1,5 @@
 import React from 'react';
+import PropTypes from 'prop-types';
 import { FormattedMessage } from 'react-intl';
 import styled from 'styled-components';
 import { palette } from 'styled-theme';
@@ -19,19 +20,19 @@ import LinkAccount from './LinkAccount';
 import NavMain from './NavMain';
 import LinkMain from './LinkMain';
 
-import logo from './sadataLogo.png';
+import logo from './logo.png';
 
 const Styled = styled.div`
   position: ${(props) => props.isHome ? 'relative' : 'absolute'};
   top:0;
   left:0;
   right:0;
-  height:115px;
-  background-color: ${palette('primary', 2)};
+  height:150px;
+  background-color: ${palette('header', 0)};
 `;
 
 
-class Header extends React.Component { // eslint-disable-line react/prefer-stateless-function
+class Header extends React.PureComponent { // eslint-disable-line react/prefer-stateless-function
 
   onClick = (evt, path) => {
     if (evt !== undefined && evt.preventDefault) evt.preventDefault();
@@ -60,24 +61,24 @@ class Header extends React.Component { // eslint-disable-line react/prefer-state
           <NavAccount>
             {isSignedIn &&
               <span>
-                <LinkAccount href={'/logout'} onClick={(evt) => this.onClick(evt, '/logout')}>
-                  <FormattedMessage {...messages.logout} />
-                </LinkAccount>
                 <LinkAccount
                   href={`/users/${this.props.userId}`}
                   onClick={(evt) => this.onClick(evt, `/users/${this.props.userId}`)}
                 >
                   <FormattedMessage {...messages.user} />
                 </LinkAccount>
+                <LinkAccount href={'/logout'} onClick={(evt) => this.onClick(evt, '/logout')}>
+                  <FormattedMessage {...messages.logout} />
+                </LinkAccount>
               </span>
             }
             {!isSignedIn &&
               <span>
-                <LinkAccount href={'/login'} onClick={(evt) => this.onClick(evt, '/login')}>
-                  <FormattedMessage {...messages.login} />
-                </LinkAccount>
                 <LinkAccount href={'/register'} onClick={(evt) => this.onClick(evt, '/register')}>
                   <FormattedMessage {...messages.register} />
+                </LinkAccount>
+                <LinkAccount href={'/login'} onClick={(evt) => this.onClick(evt, '/login')}>
+                  <FormattedMessage {...messages.login} />
                 </LinkAccount>
               </span>
             }
@@ -97,7 +98,7 @@ class Header extends React.Component { // eslint-disable-line react/prefer-state
             }
           </NavPages>
         </Banner>
-        <NavMain hasBorder={isHome}>
+        <NavMain hasBorder>
           { navItems &&
             navItems.map((item, i) => (
               <LinkMain
@@ -117,13 +118,13 @@ class Header extends React.Component { // eslint-disable-line react/prefer-state
 }
 
 Header.propTypes = {
-  isSignedIn: React.PropTypes.bool,
-  userId: React.PropTypes.string,
-  currentPath: React.PropTypes.string,
-  pages: React.PropTypes.array,
-  navItems: React.PropTypes.array,
-  onPageLink: React.PropTypes.func.isRequired,
-  isHome: React.PropTypes.bool, // not shown on home page
+  isSignedIn: PropTypes.bool,
+  userId: PropTypes.string,
+  currentPath: PropTypes.string,
+  pages: PropTypes.array,
+  navItems: PropTypes.array,
+  onPageLink: PropTypes.func.isRequired,
+  isHome: PropTypes.bool, // not shown on home page
 };
 
 Header.defaultProps = {

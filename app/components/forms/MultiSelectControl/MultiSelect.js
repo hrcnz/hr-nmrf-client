@@ -1,44 +1,78 @@
-import React, { PropTypes } from 'react';
+import React from 'react';
+import PropTypes from 'prop-types';
 import { List } from 'immutable';
 import { kebabCase, lowerCase } from 'lodash/string';
 import styled from 'styled-components';
+import { palette } from 'styled-theme';
 
-import PrimaryAction from 'components/basic/Button/PrimaryAction';
-import SimpleAction from 'components/basic/Button/SimpleAction';
+import Icon from 'components/Icon';
+import Button from 'components/buttons/Button';
+import ButtonCancel from 'components/buttons/ButtonCancel';
+import ButtonSubmit from 'components/buttons/ButtonSubmit';
 
 import IndeterminateCheckbox, { STATES as CHECKBOX_STATES } from 'components/forms/IndeterminateCheckbox';
 
 import Option from './Option';
 
+
+const OptionWrapper = styled.div`
+  padding: 0.5em 1em;
+  border-bottom: 1px solid ${palette('light', 1)};
+  display: table;
+  width: 100%;
+`;
 const ButtonGroup = styled.div`
   text-align:right;
 `;
 const ControlWrapper = styled.div``;
+const CheckboxWrapper = styled.div`
+  display: table-cell;
+  vertical-align:middle;
+  width: 10px;
+  padding-top: 3px;
+`;
+const OptionLabel = styled.label`
+  display: table-cell;
+  vertical-align:middle;
+  cursor: pointer;
+`;
 const ControlHeader = styled.div`
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
-  background: #ddd;
-  height: 40px;
-  padding: 5px;
+  background-color: ${palette('dark', 2)};
+  color: ${palette('primary', 4)};
+  height: 60px;
+  padding: 2.25em 1em 0;
 `;
+const HeaderButton = styled(Button)`
+  position: absolute;
+  right:0;
+  bottom:0;
+  padding-right:;
+  &:hover {
+    color: ${palette('primary', 1)};
+  }
+`;
+
 const ControlSearch = styled.div`
   position: absolute;
-  top: 40px;
+  top: 60px;
   left: 0;
   right: 0;
-  background: #fff;
-  height: 40px;
-  padding: 5px 10px;
-  border-left: 1px solid #E0E1E2;
-  border-right: 1px solid #E0E1E2;
+  background: ${palette('primary', 4)};
+  height: 55px;
+  padding: 1em;
+  border-left: ${palette('light', 2)};
+  border-right: ${palette('light', 2)};
+  background-color: ${palette('light', 0)};
 `;
 const Search = styled.input`
-  background:#ffffff;
+  background: ${palette('primary', 4)};
   width:100%;
-  border:1px solid #E0E1E2;
-  color:#000;
+  border:1px solid ${palette('light', 1)};
+  color: ${palette('dark', 4)};
   padding:5px;
 `;
 const ControlFooter = styled.div`
@@ -46,19 +80,20 @@ const ControlFooter = styled.div`
   bottom: 0;
   left: 0;
   right: 0;
-  background: #ddd;
+  border: 1px solid ${palette('light', 2)};
+  background-color: ${palette('light', 0)};
   height: 50px;
 `;
 const ControlMain = styled.div`
   position: absolute;
-  top: ${(props) => props.filter ? '80px' : '40px'};
-  bottom: 50px;
+  top: ${(props) => props.search ? '115px' : '60px'};
+  bottom: ${(props) => props.hasFooter ? '50px' : '0px'};
   left: 0;
   right: 0;
   overflow-y: auto;
-  padding:10px;
-  border-left: 1px solid #E0E1E2;
-  border-right: 1px solid #E0E1E2;
+  padding:0;
+  border-left: 1px solid ${palette('light', 2)};
+  border-right: 1px solid ${palette('light', 2)};
 `;
 
 export const getChangedOptions = (options) =>
@@ -97,7 +132,7 @@ export default class MultiSelect extends React.Component {
     required: PropTypes.bool,
     title: PropTypes.string,
     buttons: PropTypes.array,
-    filter: PropTypes.bool,
+    search: PropTypes.bool,
   }
 
   static defaultProps = {
@@ -105,7 +140,7 @@ export default class MultiSelect extends React.Component {
     threeState: false,
     multiple: true,
     required: false,
-    filter: true,
+    search: true,
   }
 
   constructor() {
@@ -115,7 +150,7 @@ export default class MultiSelect extends React.Component {
     };
   }
 
-  onFilter = (evt) => {
+  onSearch = (evt) => {
     if (evt && evt !== undefined) evt.stopPropagation();
     this.setState({
       query: evt.target.value,
@@ -167,67 +202,67 @@ export default class MultiSelect extends React.Component {
     const isThreeState = option.get('isThreeState');
     const id = `${checked}-${i}-${kebabCase(option.get('value'))}-${kebabCase(option.get('query'))}`;
     return (
-      <div key={id}>
-        { isThreeState &&
-          <IndeterminateCheckbox
-            id={id}
-            checked={checked}
-            onChange={(checkedState) => {
-              this.props.onChange(this.getNextValues(checkedState, option));
-            }}
-          />
-        }
-        { !isThreeState &&
-          <input
-            id={id}
-            type="checkbox"
-            checked={checked}
-            onChange={(evt) => {
-              if (evt && evt !== undefined) evt.stopPropagation();
-              this.props.onChange(this.getNextValues(evt.target.checked, option));
-            }}
-          />
-        }
-        <label htmlFor={id} >
+      <OptionWrapper key={id}>
+        <CheckboxWrapper>
+          { isThreeState &&
+            <IndeterminateCheckbox
+              id={id}
+              checked={checked}
+              onChange={(checkedState) => {
+                this.props.onChange(this.getNextValues(checkedState, option));
+              }}
+            />
+          }
+          { !isThreeState &&
+            <input
+              id={id}
+              type="checkbox"
+              checked={checked}
+              onChange={(evt) => {
+                if (evt && evt !== undefined) evt.stopPropagation();
+                this.props.onChange(this.getNextValues(evt.target.checked, option));
+              }}
+            />
+          }
+        </CheckboxWrapper>
+        <OptionLabel htmlFor={id} >
           <Option
             bold={option.get('labelBold') || checked}
             reference={typeof option.get('reference') !== 'undefined' && option.get('reference') !== null ? option.get('reference').toString() : ''}
             label={option.get('label')}
             count={option.get('showCount') && option.get('count')}
           />
-        </label>
-      </div>
+        </OptionLabel>
+      </OptionWrapper>
     );
   }
 
   renderCancel = (onCancel) => (
-    <SimpleAction onClick={onCancel} >
-      X
-    </SimpleAction>
+    <HeaderButton onClick={onCancel} >
+      <Icon name="close" size="1.75em" />
+    </HeaderButton>
   );
 
-  renderButton = (action, i) => {
-    if (action.type === 'primary') {
-      return (
-        <PrimaryAction
-          key={i}
-          onClick={action.onClick && (() => action.onClick())}
-          type={action.submit ? 'submit' : 'button'}
-        >
-          {action.title}
-        </PrimaryAction>
-      );
-    }
-    return (
-      <SimpleAction
+  renderButton = (action, i) => action.submit
+    ? (
+      <ButtonSubmit
         key={i}
         onClick={action.onClick && (() => action.onClick())}
-        type={action.submit ? 'submit' : 'button'}
+        type="submit"
       >
         {action.title}
-      </SimpleAction>
+      </ButtonSubmit>
+    )
+    : (
+      <ButtonCancel
+        key={i}
+        onClick={action.onClick && (() => action.onClick())}
+        type="button"
+      >
+        {action.title}
+      </ButtonCancel>
     );
-  }
+
   render() {
     const { options, values, threeState } = this.props;
 
@@ -245,7 +280,7 @@ export default class MultiSelect extends React.Component {
     // filter checkboxes if needed
     // match multiple words
     // see http://stackoverflow.com/questions/5421952/how-to-match-multiple-words-in-regex
-    if (this.props.filter && this.state.query) {
+    if (this.props.search && this.state.query) {
       try {
         const regex = this.state.query.split(' ').reduce((memo, str) => `${memo}(?=.*\\b${str})`, '');
         const pattern = new RegExp(regex, 'i');
@@ -280,23 +315,21 @@ export default class MultiSelect extends React.Component {
     return (
       <ControlWrapper>
         <ControlHeader>
-          { this.props.title &&
-            <strong>{this.props.title}</strong>
-          }
+          { this.props.title }
           { this.props.onCancel &&
             this.renderCancel(this.props.onCancel)
           }
         </ControlHeader>
-        { this.props.filter &&
+        { this.props.search &&
           <ControlSearch>
-            <Search id="search" onChange={this.onFilter} placeholder="Filter options" />
+            <Search id="search" onChange={this.onSearch} placeholder="Filter options" />
           </ControlSearch>
         }
-        <ControlMain filter={this.props.filter} >
+        <ControlMain search={this.props.search} hasFooter={this.props.buttons}>
           {checkboxes && checkboxes.map(this.renderCheckbox)}
         </ControlMain>
-        <ControlFooter>
-          { this.props.buttons &&
+        { this.props.buttons &&
+          <ControlFooter>
             <ButtonGroup>
               {
                 this.props.buttons.map((action, i) => (
@@ -304,8 +337,8 @@ export default class MultiSelect extends React.Component {
                 ))
               }
             </ButtonGroup>
-          }
-        </ControlFooter>
+          </ControlFooter>
+        }
       </ControlWrapper>
     );
   }

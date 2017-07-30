@@ -1,4 +1,5 @@
-import React, { PropTypes } from 'react';
+import React from 'react';
+import PropTypes from 'prop-types';
 import { Map, fromJS } from 'immutable';
 import { connect } from 'react-redux';
 import { isEqual } from 'lodash/lang';
@@ -6,6 +7,12 @@ import { Form, actions as formActions } from 'react-redux-form/immutable';
 import styled from 'styled-components';
 
 import MultiSelectControl from 'components/forms/MultiSelectControl';
+import {
+  FILTER_FORM_MODEL,
+} from './constants';
+import {
+  setFilter,
+} from './actions';
 
 const FormWrapper = styled.div`
   position: absolute;
@@ -18,15 +25,6 @@ const FormWrapper = styled.div`
 `;
 
 class EntityListForm extends React.Component { // eslint-disable-line react/prefer-stateless-function
-
-  static propTypes = {
-    populateForm: PropTypes.func.isRequired,
-    model: PropTypes.string.isRequired,
-    formOptions: PropTypes.object,
-    onSubmit: PropTypes.func,
-    onCancel: PropTypes.func,
-    buttons: PropTypes.array,
-  }
 
   componentWillMount() {
     this.props.populateForm(this.props.model, this.props.formOptions.options);
@@ -41,7 +39,6 @@ class EntityListForm extends React.Component { // eslint-disable-line react/pref
 
   render() {
     const { model, onSubmit, onCancel, buttons, formOptions } = this.props;
-
     return (
       <FormWrapper>
         <Form
@@ -55,8 +52,12 @@ class EntityListForm extends React.Component { // eslint-disable-line react/pref
             options={fromJS(formOptions.options).toList()}
             multiple={formOptions.multiple}
             required={formOptions.required}
-            filter={formOptions.filter}
+            search={formOptions.search}
             onCancel={onCancel}
+            onChange={(values) => {
+              this.props.onFormChange(values, model);
+              this.props.onSelect();
+            }}
             buttons={buttons}
           />
         </Form>
@@ -65,12 +66,28 @@ class EntityListForm extends React.Component { // eslint-disable-line react/pref
   }
 }
 
+EntityListForm.propTypes = {
+  populateForm: PropTypes.func.isRequired,
+  onFormChange: PropTypes.func.isRequired,
+  model: PropTypes.string.isRequired,
+  formOptions: PropTypes.object,
+  onSubmit: PropTypes.func,
+  onSelect: PropTypes.func,
+  onCancel: PropTypes.func,
+  buttons: PropTypes.array,
+};
+
 const mapDispatchToProps = (dispatch) => ({
   // resetForm: (model) => {
   //   dispatch(formActions.reset(model));
   // },
   populateForm: (model, options) => {
     dispatch(formActions.load(model, Map({ values: fromJS(options).toList() })));
+  },
+  onFormChange: (values, model) => {
+    if (model === FILTER_FORM_MODEL) {
+      dispatch(setFilter(values));
+    }
   },
 });
 

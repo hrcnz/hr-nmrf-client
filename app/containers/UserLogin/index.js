@@ -4,24 +4,36 @@
  *
  */
 
-import React, { PropTypes } from 'react';
+import React from 'react';
+import PropTypes from 'prop-types';
+import { FormattedMessage } from 'react-intl';
 import { connect } from 'react-redux';
 import Helmet from 'react-helmet';
-import { createStructuredSelector } from 'reselect';
+import styled from 'styled-components';
 
-import Page from 'components/Page';
-import SimpleForm from 'components/forms/SimpleForm';
+import Loading from 'components/Loading';
+import Icon from 'components/Icon';
+import ContentNarrow from 'components/ContentNarrow';
+import ContentHeader from 'components/ContentHeader';
+import AuthForm from 'components/forms/AuthForm';
+import A from 'components/styled/A';
 
 import { updatePath } from 'containers/App/actions';
-import { makeSelectAuth } from 'containers/App/selectors';
+import { selectAuth } from 'containers/App/selectors';
+
+import appMessages from 'containers/App/messages';
+import messages from './messages';
 
 import { login } from './actions';
-import makeUserLoginSelector from './selectors';
-import messages from './messages';
+import { selectDomain } from './selectors';
+
+const BottomLinks = styled.div`
+  padding: 2em 0;
+`;
 
 export class UserLogin extends React.PureComponent { // eslint-disable-line react/prefer-stateless-function
   render() {
-    const { error, messages: message } = this.props.authentication;
+    const { error, messages: message, sending } = this.props.authentication;
     const required = (val) => val && val.length;
 
     return (
@@ -35,36 +47,24 @@ export class UserLogin extends React.PureComponent { // eslint-disable-line reac
             },
           ]}
         />
-        <Page
-          title={this.context.intl.formatMessage(messages.pageTitle)}
-          actions={
-            [
-              {
-                type: 'simple',
-                title: 'Cancel',
-                onClick: this.props.handleCancel,
-              },
-              {
-                type: 'primary',
-                title: 'Login',
-                onClick: () => this.props.handleSubmit(
-                  this.props.userLogin.form.data
-                ),
-              },
-            ]
-          }
-        >
+        <ContentNarrow>
+          <ContentHeader
+            title={this.context.intl.formatMessage(messages.pageTitle)}
+          />
           {error &&
             message.map((errorMessage, i) =>
               <p key={i}>{errorMessage}</p>
             )
           }
-          { this.props.userLogin.form &&
-            <SimpleForm
+          {sending &&
+            <Loading />
+          }
+          { this.props.viewDomain.form &&
+            <AuthForm
               model="userLogin.form.data"
               handleSubmit={(formData) => this.props.handleSubmit(formData)}
               handleCancel={this.props.handleCancel}
-              labels={{ submit: 'Log in' }}
+              labels={{ submit: this.context.intl.formatMessage(messages.submit) }}
               fields={[
                 {
                   id: 'email',
@@ -75,46 +75,60 @@ export class UserLogin extends React.PureComponent { // eslint-disable-line reac
                     required,
                   },
                   errorMessages: {
-                    required: this.context.intl.formatMessage(messages.fieldRequired),
+                    required: this.context.intl.formatMessage(appMessages.forms.fieldRequired),
                   },
                 },
                 {
                   id: 'password',
                   controlType: 'input',
                   model: '.password',
+                  type: 'password',
                   placeholder: this.context.intl.formatMessage(messages.fields.password.placeholder),
                   validators: {
                     required,
                   },
                   errorMessages: {
-                    required: this.context.intl.formatMessage(messages.fieldRequired),
+                    required: this.context.intl.formatMessage(appMessages.forms.fieldRequired),
                   },
-                },
-                {
-                  id: 'register',
-                  controlType: 'link',
-                  label: false,
-                  text: this.context.intl.formatMessage(messages.registerLink),
-                  onClick: () => this.props.handleLink('/register'),
-                },
-                {
-                  id: 'passwordRecover',
-                  controlType: 'link',
-                  label: false,
-                  text: this.context.intl.formatMessage(messages.recoverPasswordLink),
-                  onClick: () => this.props.handleLink('/recoverpassword'),
                 },
               ]}
             />
           }
-        </Page>
+          <BottomLinks>
+            <p>
+              <FormattedMessage {...messages.registerLinkBefore} />
+              <A
+                href="/register"
+                onClick={(evt) => {
+                  if (evt !== undefined && evt.preventDefault) evt.preventDefault();
+                  this.props.handleLink('/register');
+                }}
+              >
+                <FormattedMessage {...messages.registerLink} />
+                <Icon name="arrowRight" text textRight size="1em" />
+              </A>
+            </p>
+            <p>
+              <A
+                href="/recoverpassword"
+                onClick={(evt) => {
+                  if (evt !== undefined && evt.preventDefault) evt.preventDefault();
+                  this.props.handleLink('/recoverpassword');
+                }}
+              >
+                <FormattedMessage {...messages.recoverPasswordLink} />
+                <Icon name="arrowRight" text textRight size="1em" />
+              </A>
+            </p>
+          </BottomLinks>
+        </ContentNarrow>
       </div>
     );
   }
 }
 
 UserLogin.propTypes = {
-  userLogin: PropTypes.object.isRequired,
+  viewDomain: PropTypes.object.isRequired,
   authentication: PropTypes.object,
   handleSubmit: PropTypes.func.isRequired,
   handleCancel: PropTypes.func.isRequired,
@@ -122,12 +136,12 @@ UserLogin.propTypes = {
 };
 
 UserLogin.contextTypes = {
-  intl: React.PropTypes.object.isRequired,
+  intl: PropTypes.object.isRequired,
 };
 
-const mapStateToProps = createStructuredSelector({
-  userLogin: makeUserLoginSelector(),
-  authentication: makeSelectAuth(),
+const mapStateToProps = (state) => ({
+  viewDomain: selectDomain(state),
+  authentication: selectAuth(state),
 });
 
 export function mapDispatchToProps(dispatch) {

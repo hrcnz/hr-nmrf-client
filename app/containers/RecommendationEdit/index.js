@@ -4,51 +4,67 @@
  *
  */
 
-import React, { PropTypes } from 'react';
+import React from 'react';
+import PropTypes from 'prop-types';
 import { connect } from 'react-redux';
 import Helmet from 'react-helmet';
 import { FormattedMessage } from 'react-intl';
 import { actions as formActions } from 'react-redux-form/immutable';
 
-import { Map, List, fromJS } from 'immutable';
+import { Map } from 'immutable';
 
-import { getCheckedValuesFromOptions } from 'components/forms/MultiSelectControl';
+import {
+  taxonomyOptions,
+  entityOptions,
+  renderMeasureControl,
+  renderTaxonomyControl,
+  getCategoryUpdatesFromFormData,
+  getConnectionUpdatesFromFormData,
+  getTitleFormField,
+  getReferenceFormField,
+  getAcceptedField,
+  getStatusField,
+  getMarkdownField,
+} from 'utils/forms';
 
-import { PUBLISH_STATUSES, USER_ROLES } from 'containers/App/constants';
+import {
+  getMetaField,
+} from 'utils/fields';
+
+import { USER_ROLES, CONTENT_SINGLE } from 'containers/App/constants';
+import appMessages from 'containers/App/messages';
 
 import {
   loadEntitiesIfNeeded,
   redirectIfNotPermitted,
   updatePath,
   updateEntityForm,
+  deleteEntity,
 } from 'containers/App/actions';
 
-import Page from 'components/Page';
+import { selectReady, selectIsUserAdmin } from 'containers/App/selectors';
+
+import Loading from 'components/Loading';
+import Content from 'components/Content';
+import ContentHeader from 'components/ContentHeader';
 import EntityForm from 'components/forms/EntityForm';
 
 import {
-  getEntity,
-  getEntities,
-  isReady,
-} from 'containers/App/selectors';
-
-import {
-  taxonomyOptions,
-  entityOptions,
-  renderActionControl,
-  renderTaxonomyControl,
-} from 'utils/forms';
-
-import viewDomainSelect from './selectors';
+  selectDomain,
+  selectViewEntity,
+  selectTaxonomies,
+  selectMeasures,
+} from './selectors';
 
 import messages from './messages';
 import { save } from './actions';
+import { DEPENDENCIES, FORM_INITIAL } from './constants';
 
 export class RecommendationEdit extends React.PureComponent { // eslint-disable-line react/prefer-stateless-function
 
   componentWillMount() {
     this.props.loadEntitiesIfNeeded();
-    if (this.props.dataReady && this.props.recommendation) {
+    if (this.props.dataReady && this.props.viewEntity) {
       this.props.populateForm('recommendationEdit.form.data', this.getInitialFormData());
     }
   }
@@ -59,7 +75,7 @@ export class RecommendationEdit extends React.PureComponent { // eslint-disable-
       this.props.loadEntitiesIfNeeded();
     }
     // repopulate if new data becomes ready
-    if (nextProps.dataReady && !this.props.dataReady && nextProps.recommendation) {
+    if (nextProps.dataReady && !this.props.dataReady && nextProps.viewEntity) {
       this.props.redirectIfNotPermitted();
       this.props.populateForm('recommendationEdit.form.data', this.getInitialFormData(nextProps));
     }
@@ -67,22 +83,65 @@ export class RecommendationEdit extends React.PureComponent { // eslint-disable-
 
   getInitialFormData = (nextProps) => {
     const props = nextProps || this.props;
-    const { taxonomies, actions, recommendation } = props;
-    return recommendation
+    const { taxonomies, measures, viewEntity } = props;
+    return viewEntity
     ? Map({
-      id: recommendation.id,
-      attributes: fromJS(recommendation.attributes),
+      id: viewEntity.get('id'),
+      attributes: viewEntity.get('attributes').mergeWith(
+        (oldVal, newVal) => oldVal === null ? newVal : oldVal,
+        FORM_INITIAL.get('attributes')
+      ),
       associatedTaxonomies: taxonomyOptions(taxonomies),
-      associatedActions: entityOptions(actions, true),
+      associatedMeasures: entityOptions(measures, true),
     })
     : Map();
   };
 
+  getHeaderMainFields = () => ([ // fieldGroups
+    { // fieldGroup
+      fields: [
+        getReferenceFormField(this.context.intl.formatMessage, appMessages, true), // required
+        getTitleFormField(this.context.intl.formatMessage, appMessages, 'titleText'),
+      ],
+    },
+  ]);
+
+  getHeaderAsideFields = (entity) => ([
+    {
+      fields: [
+        getStatusField(this.context.intl.formatMessage, appMessages, entity),
+        getMetaField(entity, appMessages),
+      ],
+    },
+  ]);
+  getBodyMainFields = (entity, measures) => ([
+    {
+      fields: [
+        getAcceptedField(this.context.intl.formatMessage, appMessages, entity),
+        getMarkdownField(this.context.intl.formatMessage, appMessages, 'response'),
+      ],
+    },
+    {
+      label: this.context.intl.formatMessage(appMessages.entities.connections.plural),
+      icon: 'connections',
+      fields: [
+        renderMeasureControl(measures),
+      ],
+    },
+  ]);
+
+  getBodyAsideFields = (taxonomies) => ([ // fieldGroups
+    { // fieldGroup
+      label: this.context.intl.formatMessage(appMessages.entities.taxonomies.plural),
+      icon: 'categories',
+      fields: renderTaxonomyControl(taxonomies),
+    },
+  ]);
+
   render() {
-    const { recommendation, dataReady, viewDomain } = this.props;
+    const { viewEntity, dataReady, viewDomain, measures, taxonomies } = this.props;
     const reference = this.props.params.id;
-    const { saveSending, saveError } = viewDomain.page;
-    const required = (val) => val && val.length;
+    const { saveSending, saveError, deleteSending, deleteError } = viewDomain.page;
 
     return (
       <div>
@@ -92,104 +151,65 @@ export class RecommendationEdit extends React.PureComponent { // eslint-disable-
             { name: 'description', content: this.context.intl.formatMessage(messages.metaDescription) },
           ]}
         />
-        { !recommendation && !dataReady &&
-          <div>
-            <FormattedMessage {...messages.loading} />
-          </div>
-        }
-        { !recommendation && dataReady &&
-          <div>
-            <FormattedMessage {...messages.notFound} />
-          </div>
-        }
-        {recommendation &&
-          <Page
+        <Content>
+          <ContentHeader
             title={this.context.intl.formatMessage(messages.pageTitle)}
-            actions={[
-              {
-                type: 'simple',
-                title: 'Cancel',
+            type={CONTENT_SINGLE}
+            icon="recommendations"
+            buttons={
+              viewEntity && dataReady ? [{
+                type: 'cancel',
                 onClick: this.props.handleCancel,
               },
               {
-                type: 'primary',
-                title: 'Save',
+                type: 'save',
                 onClick: () => this.props.handleSubmit(
                   viewDomain.form.data,
-                  this.props.taxonomies,
-                  this.props.actions
+                  taxonomies,
+                  measures,
                 ),
-              },
-            ]}
-          >
-            {saveSending &&
-              <p>Saving</p>
+              }] : null
             }
-            {saveError &&
-              <p>{saveError}</p>
-            }
-            { dataReady &&
-              <EntityForm
-                model="recommendationEdit.form.data"
-                formData={viewDomain.form.data}
-                handleSubmit={(formData) => this.props.handleSubmit(
-                  formData,
-                  this.props.taxonomies,
-                  this.props.actions
-                )}
-                handleCancel={this.props.handleCancel}
-                handleUpdate={this.props.handleUpdate}
-                fields={{
-                  header: {
-                    main: [
-                      {
-                        id: 'title',
-                        controlType: 'input',
-                        model: '.attributes.title',
-                        validators: {
-                          required,
-                        },
-                        errorMessages: {
-                          required: this.context.intl.formatMessage(messages.fieldRequired),
-                        },
-                      },
-                    ],
-                    aside: [
-                      {
-                        id: 'number',
-                        controlType: 'input',
-                        model: '.attributes.number',
-                      },
-                      {
-                        id: 'status',
-                        controlType: 'select',
-                        model: '.attributes.draft',
-                        value: recommendation.attributes.draft,
-                        options: PUBLISH_STATUSES,
-                      },
-                      {
-                        id: 'updated',
-                        controlType: 'info',
-                        displayValue: recommendation.attributes.updated_at,
-                      },
-                      {
-                        id: 'updated_by',
-                        controlType: 'info',
-                        displayValue: recommendation.user && recommendation.user.attributes.name,
-                      },
-                    ],
-                  },
-                  body: {
-                    main: [
-                      renderActionControl(this.props.actions),
-                    ],
-                    aside: renderTaxonomyControl(this.props.taxonomies),
-                  },
-                }}
-              />
-            }
-          </Page>
-        }
+          />
+          {(saveSending || deleteSending || !dataReady) &&
+            <Loading />
+          }
+          {deleteError &&
+            <p>{deleteError}</p>
+          }
+          {saveError &&
+            <p>{saveError}</p>
+          }
+          {!viewEntity && dataReady && !saveError && !deleteSending &&
+            <div>
+              <FormattedMessage {...messages.notFound} />
+            </div>
+          }
+          {viewEntity && dataReady && !deleteSending &&
+            <EntityForm
+              model="recommendationEdit.form.data"
+              formData={viewDomain.form.data}
+              handleSubmit={(formData) => this.props.handleSubmit(
+                formData,
+                taxonomies,
+                measures
+              )}
+              handleCancel={this.props.handleCancel}
+              handleUpdate={this.props.handleUpdate}
+              handleDelete={this.props.isUserAdmin ? this.props.handleDelete : null}
+              fields={{
+                header: {
+                  main: this.getHeaderMainFields(),
+                  aside: this.getHeaderAsideFields(viewEntity),
+                },
+                body: {
+                  main: this.getBodyMainFields(viewEntity, measures),
+                  aside: this.getBodyAsideFields(taxonomies),
+                },
+              }}
+            />
+          }
+        </Content>
       </div>
     );
   }
@@ -202,94 +222,32 @@ RecommendationEdit.propTypes = {
   handleSubmit: PropTypes.func.isRequired,
   handleCancel: PropTypes.func.isRequired,
   handleUpdate: PropTypes.func.isRequired,
+  handleDelete: PropTypes.func.isRequired,
   viewDomain: PropTypes.object,
-  recommendation: PropTypes.object,
+  viewEntity: PropTypes.object,
   dataReady: PropTypes.bool,
+  isUserAdmin: PropTypes.bool,
   params: PropTypes.object,
   taxonomies: PropTypes.object,
-  actions: PropTypes.object,
+  measures: PropTypes.object,
 };
 
 RecommendationEdit.contextTypes = {
-  intl: React.PropTypes.object.isRequired,
+  intl: PropTypes.object.isRequired,
 };
-
 const mapStateToProps = (state, props) => ({
-  viewDomain: viewDomainSelect(state),
-  dataReady: isReady(state, { path: [
-    'recommendations',
-    'users',
-    'categories',
-    'taxonomies',
-    'measures',
-    'recommendation_measures',
-    'recommendation_categories',
-  ] }),
-  recommendation: getEntity(
-    state,
-    {
-      id: props.params.id,
-      path: 'recommendations',
-      out: 'js',
-      extend: {
-        type: 'single',
-        path: 'users',
-        key: 'last_modified_user_id',
-        as: 'user',
-      },
-    },
-  ),
-  // all categories for all taggable taxonomies, listing connection if any
-  taxonomies: getEntities(
-    state,
-    {
-      path: 'taxonomies',
-      where: {
-        tags_recommendations: true,
-      },
-      extend: {
-        path: 'categories',
-        key: 'taxonomy_id',
-        reverse: true,
-        extend: {
-          as: 'associated',
-          path: 'recommendation_categories',
-          key: 'category_id',
-          reverse: true,
-          where: {
-            recommendation_id: props.params.id,
-          },
-        },
-      },
-    },
-  ),
-  // // all actions, listing connection if any
-  actions: getEntities(
-    state, {
-      path: 'measures',
-      extend: {
-        as: 'associated',
-        path: 'recommendation_measures',
-        key: 'measure_id',
-        reverse: true,
-        where: {
-          recommendation_id: props.params.id,
-        },
-      },
-    },
-  ),
+  viewDomain: selectDomain(state),
+  isUserAdmin: selectIsUserAdmin(state),
+  dataReady: selectReady(state, { path: DEPENDENCIES }),
+  viewEntity: selectViewEntity(state, props.params.id),
+  taxonomies: selectTaxonomies(state, props.params.id),
+  measures: selectMeasures(state, props.params.id),
 });
 
 function mapDispatchToProps(dispatch, props) {
   return {
     loadEntitiesIfNeeded: () => {
-      dispatch(loadEntitiesIfNeeded('measures'));
-      dispatch(loadEntitiesIfNeeded('users'));
-      dispatch(loadEntitiesIfNeeded('categories'));
-      dispatch(loadEntitiesIfNeeded('taxonomies'));
-      dispatch(loadEntitiesIfNeeded('recommendations'));
-      dispatch(loadEntitiesIfNeeded('recommendation_measures'));
-      dispatch(loadEntitiesIfNeeded('recommendation_categories'));
+      DEPENDENCIES.forEach((path) => dispatch(loadEntitiesIfNeeded(path)));
     },
     redirectIfNotPermitted: () => {
       dispatch(redirectIfNotPermitted(USER_ROLES.MANAGER));
@@ -297,61 +255,26 @@ function mapDispatchToProps(dispatch, props) {
     populateForm: (model, formData) => {
       dispatch(formActions.load(model, formData));
     },
-    handleSubmit: (formData, taxonomies, actions) => {
-      let saveData = formData.set('recommendationCategories', taxonomies.reduce((updates, tax, taxId) => {
-        const formCategoryIds = getCheckedValuesFromOptions(formData.getIn(['associatedTaxonomies', taxId]));
-
-        // store associated cats as { [cat.id]: [association.id], ... }
-        // then we can use keys for creating new associations and values for deleting
-        const associatedCategories = tax.get('categories').reduce((catsAssociated, cat) => {
-          if (cat.get('associated')) {
-            return catsAssociated.set(cat.get('id'), cat.get('associated').keySeq().first());
-          }
-          return catsAssociated;
-        }, Map());
-
-        return Map({
-          delete: updates.get('delete').concat(associatedCategories.reduce((associatedIds, associatedId, catId) =>
-            !formCategoryIds.includes(catId)
-              ? associatedIds.push(associatedId)
-              : associatedIds
-          , List())),
-          create: updates.get('create').concat(formCategoryIds.reduce((payloads, catId) =>
-            !associatedCategories.has(catId)
-              ? payloads.push(Map({
-                category_id: catId,
-                recommendation_id: formData.get('id'),
-              }))
-              : payloads
-          , List())),
-        });
-      }, Map({ delete: List(), create: List() })));
-
-      // actions
-      const formActionIds = getCheckedValuesFromOptions(formData.get('associatedActions'));
-      // store associated Actions as { [action.id]: [association.id], ... }
-      const associatedActions = actions.reduce((actionsAssociated, action) => {
-        if (action.get('associated')) {
-          return actionsAssociated.set(action.get('id'), action.get('associated').keySeq().first());
-        }
-        return actionsAssociated;
-      }, Map());
-
-      saveData = saveData.set('recommendationMeasures', Map({
-        delete: associatedActions.reduce((associatedIds, associatedId, id) =>
-          !formActionIds.includes(id)
-            ? associatedIds.push(associatedId)
-            : associatedIds
-        , List()),
-        create: formActionIds.reduce((payloads, id) =>
-          !associatedActions.has(id)
-            ? payloads.push(Map({
-              measure_id: id,
-              recommendation_id: formData.get('id'),
-            }))
-            : payloads
-        , List()),
-      }));
+    handleSubmit: (formData, taxonomies, measures) => {
+      const saveData = formData
+        .set(
+          'recommendationCategories',
+          getCategoryUpdatesFromFormData({
+            formData,
+            taxonomies,
+            createKey: 'recommendation_id',
+          })
+        )
+        .set(
+          'recommendationMeasures',
+          getConnectionUpdatesFromFormData({
+            formData,
+            connections: measures,
+            connectionAttribute: 'associatedMeasures',
+            createConnectionKey: 'measure_id',
+            createKey: 'recommendation_id',
+          })
+        );
 
       dispatch(save(saveData.toJS()));
       // dispatch(save(formData, props.params.id));
@@ -361,6 +284,12 @@ function mapDispatchToProps(dispatch, props) {
     },
     handleUpdate: (formData) => {
       dispatch(updateEntityForm(formData));
+    },
+    handleDelete: () => {
+      dispatch(deleteEntity({
+        path: 'recommendations',
+        id: props.params.id,
+      }));
     },
   };
 }

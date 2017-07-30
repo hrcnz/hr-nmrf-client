@@ -4,15 +4,22 @@
  *
  */
 
-import React, { PropTypes } from 'react';
+import React from 'react';
+import PropTypes from 'prop-types';
 import { connect } from 'react-redux';
 import Helmet from 'react-helmet';
 
-import { List } from 'immutable';
+import {
+  getTitleFormField,
+  getDueDateOptionsField,
+  getDocumentStatusField,
+  getStatusField,
+  getMarkdownField,
+  getUploadField,
+} from 'utils/forms';
 
-import { getCheckedValuesFromOptions } from 'components/forms/MultiSelectControl';
-
-import { PUBLISH_STATUSES } from 'containers/App/constants';
+import { CONTENT_SINGLE } from 'containers/App/constants';
+import appMessages from 'containers/App/messages';
 
 import {
   loadEntitiesIfNeeded,
@@ -20,19 +27,21 @@ import {
   updateEntityForm,
 } from 'containers/App/actions';
 
-import { getEntity, isReady } from 'containers/App/selectors';
+import { selectReady } from 'containers/App/selectors';
 
-import Page from 'components/Page';
+import Loading from 'components/Loading';
+import Content from 'components/Content';
+import ContentHeader from 'components/ContentHeader';
 import EntityForm from 'components/forms/EntityForm';
 
 import {
-  renderDateControl,
-} from 'utils/forms';
+  selectDomain,
+  selectIndicator,
+} from './selectors';
 
-import viewDomainSelect from './selectors';
 import messages from './messages';
 import { save } from './actions';
-
+import { DEPENDENCIES } from './constants';
 
 export class ReportNew extends React.PureComponent { // eslint-disable-line react/prefer-stateless-function
 
@@ -46,17 +55,50 @@ export class ReportNew extends React.PureComponent { // eslint-disable-line reac
     }
   }
 
+  getHeaderMainFields = () => ([ // fieldGroups
+    { // fieldGroup
+      fields: [
+        getTitleFormField(this.context.intl.formatMessage, appMessages),
+      ],
+    },
+  ]);
+
+  getHeaderAsideFields = () => ([{
+    fields: [getStatusField(this.context.intl.formatMessage, appMessages)],
+  }]);
+
+  getBodyMainFields = () => ([
+    {
+      fields: [
+        getMarkdownField(this.context.intl.formatMessage, appMessages),
+        getUploadField(this.context.intl.formatMessage, appMessages),
+        getDocumentStatusField(this.context.intl.formatMessage, appMessages),
+      ],
+    },
+  ]);
+
+  getBodyAsideFields = (indicator) => ([ // fieldGroups
+    { // fieldGroup
+      label: this.context.intl.formatMessage(appMessages.entities.due_dates.single),
+      icon: 'calendar',
+      fields: indicator &&
+        [getDueDateOptionsField(
+          this.context.intl.formatMessage,
+          appMessages,
+          this.context.intl.formatDate,
+          indicator.get('dates'),
+          '0',
+        )],
+    },
+  ]);
+
   render() {
     const { dataReady, indicator, viewDomain } = this.props;
     const { saveSending, saveError } = viewDomain.page;
     const indicatorReference = this.props.params.id;
-    const required = (val) => val && val.length;
-
-    // TODO allow all past but only first upcoming due date
-    const dateOptions = indicator && renderDateControl(indicator.get('dates'));
 
     let pageTitle = this.context.intl.formatMessage(messages.pageTitle);
-    pageTitle = `${pageTitle} (Indicator: ${indicatorReference})`;
+    pageTitle = `${pageTitle} for indicator ${indicatorReference}`;
 
     return (
       <div>
@@ -69,34 +111,32 @@ export class ReportNew extends React.PureComponent { // eslint-disable-line reac
             },
           ]}
         />
-        {dataReady &&
-          <Page
+        <Content>
+          <ContentHeader
             title={pageTitle}
-            actions={
-              [
-                {
-                  type: 'simple',
-                  title: 'Cancel',
-                  onClick: () => this.props.handleCancel(indicatorReference),
-                },
-                {
-                  type: 'primary',
-                  title: 'Save',
-                  onClick: () => this.props.handleSubmit(
-                    viewDomain.form.data,
-                    indicatorReference
-                  ),
-                },
-              ]
+            type={CONTENT_SINGLE}
+            icon="reports"
+            buttons={
+              dataReady ? [{
+                type: 'cancel',
+                onClick: () => this.props.handleCancel(indicatorReference),
+              },
+              {
+                type: 'save',
+                onClick: () => this.props.handleSubmit(viewDomain.form.data, indicatorReference),
+              }] : null
             }
-          >
-            {saveSending &&
-              <p>Saving Report</p>
-            }
-            {saveError &&
-              <p>{saveError}</p>
-            }
-
+          />
+          {saveSending &&
+            <Loading />
+          }
+          {saveError &&
+            <p>{saveError}</p>
+          }
+          { !dataReady &&
+            <Loading />
+          }
+          {dataReady &&
             <EntityForm
               model="reportNew.form.data"
               formData={viewDomain.form.data}
@@ -108,54 +148,17 @@ export class ReportNew extends React.PureComponent { // eslint-disable-line reac
               handleUpdate={this.props.handleUpdate}
               fields={{
                 header: {
-                  main: [
-                    {
-                      id: 'title',
-                      controlType: 'input',
-                      model: '.attributes.title',
-                      placeholder: this.context.intl.formatMessage(messages.fields.title.placeholder),
-                      validators: {
-                        required,
-                      },
-                      errorMessages: {
-                        required: this.context.intl.formatMessage(messages.fieldRequired),
-                      },
-                    },
-                  ],
-                  aside: [
-                    {
-                      id: 'status',
-                      controlType: 'select',
-                      model: '.attributes.draft',
-                      options: PUBLISH_STATUSES,
-                    },
-                  ],
+                  main: this.getHeaderMainFields(),
+                  aside: this.getHeaderAsideFields(),
                 },
                 body: {
-                  main: [
-                    dateOptions,
-                    {
-                      id: 'description',
-                      controlType: 'textarea',
-                      model: '.attributes.description',
-                    },
-                    {
-                      id: 'document_url',
-                      controlType: 'uploader',
-                      model: '.attributes.document_url',
-                    },
-                    {
-                      id: 'document_public',
-                      controlType: 'select',
-                      model: '.attributes.document_public',
-                      options: PUBLISH_STATUSES,
-                    },
-                  ],
+                  main: this.getBodyMainFields(),
+                  aside: this.getBodyAsideFields(indicator),
                 },
               }}
             />
-          </Page>
-        }
+          }
+        </Content>
       </div>
     );
   }
@@ -173,58 +176,28 @@ ReportNew.propTypes = {
 };
 
 ReportNew.contextTypes = {
-  intl: React.PropTypes.object.isRequired,
+  intl: PropTypes.object.isRequired,
 };
 
 const mapStateToProps = (state, props) => ({
-  viewDomain: viewDomainSelect(state),
-  dataReady: isReady(state, { path: [
-    'indicators',
-    'due_dates',
-    'progress_reports',
-  ] }),
-  indicator: getEntity(
-    state,
-    {
-      id: props.params.id,
-      path: 'indicators',
-      extend: {
-        path: 'due_dates',
-        key: 'indicator_id',
-        reverse: true,
-        as: 'dates',
-        without: {
-          path: 'progress_reports',
-          key: 'due_date_id',
-        },
-        extend: {
-          type: 'count',
-          path: 'progress_reports',
-          key: 'due_date_id',
-          reverse: true,
-          as: 'reportCount',
-        },
-      },
-    },
-  ),
+  viewDomain: selectDomain(state),
+  dataReady: selectReady(state, { path: DEPENDENCIES }),
+  indicator: selectIndicator(state, props.params.id),
 });
 
 function mapDispatchToProps(dispatch) {
   return {
     loadEntitiesIfNeeded: () => {
-      dispatch(loadEntitiesIfNeeded('progress_reports'));
-      dispatch(loadEntitiesIfNeeded('due_dates'));
-      dispatch(loadEntitiesIfNeeded('indicators'));
+      DEPENDENCIES.forEach((path) => dispatch(loadEntitiesIfNeeded(path)));
     },
     handleSubmit: (formData, indicatorReference) => {
       let saveData = formData;
 
       saveData = saveData.setIn(['attributes', 'indicator_id'], indicatorReference);
 
-      // TODO: remove once have singleselect instead of multiselect
-      const formDateIds = getCheckedValuesFromOptions(formData.get('associatedDate'));
-      if (List.isList(formDateIds) && formDateIds.size) {
-        saveData = saveData.setIn(['attributes', 'due_date_id'], formDateIds.first());
+      const dateAssigned = formData.getIn(['attributes', 'due_date_id']);
+      if (dateAssigned === 0) {
+        saveData = saveData.setIn(['attributes', 'due_date_id'], null);
       }
 
       dispatch(save(saveData.toJS()));

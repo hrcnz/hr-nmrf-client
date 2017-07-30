@@ -4,41 +4,58 @@
  *
  */
 
-import React, { PropTypes } from 'react';
+import React from 'react';
+import PropTypes from 'prop-types';
 import { connect } from 'react-redux';
 import Helmet from 'react-helmet';
 import { FormattedMessage } from 'react-intl';
 import { actions as formActions } from 'react-redux-form/immutable';
 
-import { fromJS } from 'immutable';
+import { Map } from 'immutable';
 
-import { PUBLISH_STATUSES, USER_ROLES } from 'containers/App/constants';
+import {
+  getTitleFormField,
+  getMenuTitleFormField,
+  getMarkdownField,
+  getStatusField,
+} from 'utils/forms';
+
+import {
+  getMetaField,
+} from 'utils/fields';
+
+import { USER_ROLES, CONTENT_SINGLE } from 'containers/App/constants';
+import appMessages from 'containers/App/messages';
 
 import {
   loadEntitiesIfNeeded,
   redirectIfNotPermitted,
   updatePath,
   updateEntityForm,
-} from 'containers/App/actions';
+  deleteEntity,
+  } from 'containers/App/actions';
 
-import Page from 'components/Page';
+import { selectReady, selectIsUserAdmin } from 'containers/App/selectors';
+
+import Loading from 'components/Loading';
+import Content from 'components/Content';
+import ContentHeader from 'components/ContentHeader';
 import EntityForm from 'components/forms/EntityForm';
 
 import {
-  getEntity,
-  isReady,
-} from 'containers/App/selectors';
-
-import viewDomainSelect from './selectors';
+  selectDomain,
+  selectViewEntity,
+} from './selectors';
 
 import messages from './messages';
 import { save } from './actions';
+import { DEPENDENCIES, FORM_INITIAL } from './constants';
 
 export class PageEdit extends React.Component { // eslint-disable-line react/prefer-stateless-function
 
   componentWillMount() {
     this.props.loadEntitiesIfNeeded();
-    if (this.props.dataReady && this.props.page) {
+    if (this.props.dataReady && this.props.viewEntity) {
       this.props.populateForm('pageEdit.form.data', this.getInitialFormData());
     }
   }
@@ -49,7 +66,7 @@ export class PageEdit extends React.Component { // eslint-disable-line react/pre
       this.props.loadEntitiesIfNeeded();
     }
     // repopulate if new data becomes ready
-    if (nextProps.dataReady && !this.props.dataReady && nextProps.page) {
+    if (nextProps.dataReady && !this.props.dataReady && nextProps.viewEntity) {
       this.props.redirectIfNotPermitted();
       this.props.populateForm('pageEdit.form.data', this.getInitialFormData(nextProps));
     }
@@ -57,15 +74,44 @@ export class PageEdit extends React.Component { // eslint-disable-line react/pre
 
   getInitialFormData = (nextProps) => {
     const props = nextProps || this.props;
-    const { page } = props;
-    return fromJS(page);
+    const { viewEntity } = props;
+    return viewEntity
+    ? Map({
+      id: viewEntity.get('id'),
+      attributes: viewEntity.get('attributes').mergeWith(
+        (oldVal, newVal) => oldVal === null ? newVal : oldVal,
+        FORM_INITIAL.get('attributes')
+      ),
+    })
+    : Map();
   }
 
+  getHeaderMainFields = () => ([ // fieldGroups
+    { // fieldGroup
+      fields: [
+        getTitleFormField(this.context.intl.formatMessage, appMessages),
+        getMenuTitleFormField(this.context.intl.formatMessage, appMessages),
+      ],
+    },
+  ]);
+
+  getHeaderAsideFields = (entity) => ([
+    {
+      fields: [
+        getStatusField(this.context.intl.formatMessage, appMessages, entity),
+        getMetaField(entity, appMessages),
+      ],
+    },
+  ]);
+
+  getBodyMainFields = () => ([{
+    fields: [getMarkdownField(this.context.intl.formatMessage, appMessages, 'content')],
+  }]);
+
   render() {
-    const { page, dataReady, viewDomain } = this.props;
+    const { viewEntity, dataReady, viewDomain } = this.props;
     const reference = this.props.params.id;
-    const { saveSending, saveError } = viewDomain.page;
-    const required = (val) => val && val.length;
+    const { saveSending, saveError, deleteSending, deleteError } = viewDomain.page;
 
     return (
       <div>
@@ -75,104 +121,56 @@ export class PageEdit extends React.Component { // eslint-disable-line react/pre
             { name: 'description', content: this.context.intl.formatMessage(messages.metaDescription) },
           ]}
         />
-        { !page && !dataReady &&
-          <div>
-            <FormattedMessage {...messages.loading} />
-          </div>
-        }
-        { !page && dataReady && !saveError &&
-          <div>
-            <FormattedMessage {...messages.notFound} />
-          </div>
-        }
-        {page &&
-          <Page
+        <Content>
+          <ContentHeader
             title={this.context.intl.formatMessage(messages.pageTitle)}
-            actions={[
-              {
-                type: 'simple',
-                title: 'Cancel',
+            type={CONTENT_SINGLE}
+            icon="categories"
+            buttons={
+              viewEntity && dataReady ? [{
+                type: 'cancel',
                 onClick: this.props.handleCancel,
               },
               {
-                type: 'primary',
-                title: 'Save',
+                type: 'save',
                 onClick: () => this.props.handleSubmit(viewDomain.form.data),
-              },
-            ]}
-          >
-            {saveSending &&
-              <p>Saving</p>
+              }] : null
             }
-            {saveError &&
-              <p>{saveError}</p>
-            }
+          />
+          {(saveSending || deleteSending || !dataReady) &&
+            <Loading />
+          }
+          {deleteError &&
+            <p>{deleteError}</p>
+          }
+          {saveError &&
+            <p>{saveError}</p>
+          }
+          {!viewEntity && dataReady && !saveError && !deleteSending &&
+            <div>
+              <FormattedMessage {...messages.notFound} />
+            </div>
+          }
+          {viewEntity && dataReady && !deleteSending &&
             <EntityForm
               model="pageEdit.form.data"
               formData={viewDomain.form.data}
               handleSubmit={(formData) => this.props.handleSubmit(formData)}
               handleCancel={this.props.handleCancel}
               handleUpdate={this.props.handleUpdate}
+              handleDelete={this.props.isUserAdmin ? this.props.handleDelete : null}
               fields={{
                 header: {
-                  main: [
-                    {
-                      id: 'title',
-                      controlType: 'input',
-                      model: '.attributes.title',
-                      validators: {
-                        required,
-                      },
-                      errorMessages: {
-                        required: this.context.intl.formatMessage(messages.fieldRequired),
-                      },
-                    },
-                    {
-                      id: 'menuTitle',
-                      controlType: 'input',
-                      label: 'Menu title',
-                      model: '.attributes.menu_title',
-                    },
-                  ],
-                  aside: [
-                    {
-                      id: 'no',
-                      controlType: 'info',
-                      displayValue: reference,
-                    },
-                    {
-                      id: 'status',
-                      controlType: 'select',
-                      model: '.attributes.draft',
-                      value: page.draft,
-                      options: PUBLISH_STATUSES,
-                    },
-                    {
-                      id: 'updated',
-                      controlType: 'info',
-                      displayValue: page.attributes.updated_at,
-                    },
-                    {
-                      id: 'updated_by',
-                      controlType: 'info',
-                      displayValue: page.user && page.user.attributes.name,
-                    },
-                  ],
+                  main: this.getHeaderMainFields(),
+                  aside: this.getHeaderAsideFields(viewEntity),
                 },
                 body: {
-                  main: [
-                    {
-                      id: 'content',
-                      controlType: 'textarea',
-                      model: '.attributes.content',
-                    },
-                  ],
-                  aside: [],
+                  main: this.getBodyMainFields(viewEntity),
                 },
               }}
             />
-          </Page>
-        }
+          }
+        </Content>
       </div>
     );
   }
@@ -185,46 +183,29 @@ PageEdit.propTypes = {
   handleSubmit: PropTypes.func.isRequired,
   handleCancel: PropTypes.func.isRequired,
   handleUpdate: PropTypes.func.isRequired,
+  handleDelete: PropTypes.func.isRequired,
   viewDomain: PropTypes.object,
   dataReady: PropTypes.bool,
+  isUserAdmin: PropTypes.bool,
   params: PropTypes.object,
-  page: PropTypes.object,
+  viewEntity: PropTypes.object,
 };
 
 PageEdit.contextTypes = {
-  intl: React.PropTypes.object.isRequired,
+  intl: PropTypes.object.isRequired,
 };
 
 const mapStateToProps = (state, props) => ({
-  viewDomain: viewDomainSelect(state),
-  dataReady: isReady(state, { path: [
-    'users',
-    'pages',
-  ] }),
-
-  page: getEntity(
-    state,
-    {
-      id: props.params.id,
-      path: 'pages',
-      out: 'js',
-      extend: [
-        {
-          type: 'single',
-          path: 'users',
-          key: 'last_modified_user_id',
-          as: 'user',
-        },
-      ],
-    },
-  ),
+  viewDomain: selectDomain(state),
+  isUserAdmin: selectIsUserAdmin(state),
+  dataReady: selectReady(state, { path: DEPENDENCIES }),
+  viewEntity: selectViewEntity(state, props.params.id),
 });
 
 function mapDispatchToProps(dispatch, props) {
   return {
     loadEntitiesIfNeeded: () => {
-      dispatch(loadEntitiesIfNeeded('users'));
-      dispatch(loadEntitiesIfNeeded('pages'));
+      DEPENDENCIES.forEach((path) => dispatch(loadEntitiesIfNeeded(path)));
     },
     redirectIfNotPermitted: () => {
       dispatch(redirectIfNotPermitted(USER_ROLES.ADMIN));
@@ -240,6 +221,12 @@ function mapDispatchToProps(dispatch, props) {
     },
     handleUpdate: (formData) => {
       dispatch(updateEntityForm(formData));
+    },
+    handleDelete: () => {
+      dispatch(deleteEntity({
+        path: 'pages',
+        id: props.params.id,
+      }));
     },
   };
 }

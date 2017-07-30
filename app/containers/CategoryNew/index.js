@@ -4,16 +4,26 @@
  *
  */
 
-import React, { PropTypes } from 'react';
+import React from 'react';
+import PropTypes from 'prop-types';
 import { connect } from 'react-redux';
 import Helmet from 'react-helmet';
-import { FormattedMessage } from 'react-intl';
 
 import { List } from 'immutable';
 
+import {
+  renderUserControl,
+  getTitleFormField,
+  getReferenceFormField,
+  getShortTitleFormField,
+  getMarkdownField,
+  getFormField,
+} from 'utils/forms';
+
 import { getCheckedValuesFromOptions } from 'components/forms/MultiSelectControl';
 
-import { USER_ROLES } from 'containers/App/constants';
+import { USER_ROLES, CONTENT_SINGLE } from 'containers/App/constants';
+import appMessages from 'containers/App/messages';
 
 import {
   loadEntitiesIfNeeded,
@@ -23,22 +33,24 @@ import {
 } from 'containers/App/actions';
 
 import {
-  getEntity,
-  getEntities,
-  isReady,
-  isUserAdmin,
+  selectReady,
+  selectIsUserAdmin,
+  selectEntity,
 } from 'containers/App/selectors';
 
-import Page from 'components/Page';
+import Loading from 'components/Loading';
+import Content from 'components/Content';
+import ContentHeader from 'components/ContentHeader';
 import EntityForm from 'components/forms/EntityForm';
 
 import {
-  renderUserControl,
-} from 'utils/forms';
+  selectDomain,
+  selectUsers,
+} from './selectors';
 
-import viewDomainSelect from './selectors';
 import messages from './messages';
 import { save } from './actions';
+import { DEPENDENCIES } from './constants';
 
 
 export class CategoryNew extends React.PureComponent { // eslint-disable-line react/prefer-stateless-function
@@ -57,20 +69,46 @@ export class CategoryNew extends React.PureComponent { // eslint-disable-line re
     }
   }
 
+  getHeaderMainFields = () => ([ // fieldGroups
+    { // fieldGroup
+      fields: [
+        getReferenceFormField(this.context.intl.formatMessage, appMessages),
+        getTitleFormField(this.context.intl.formatMessage, appMessages),
+        getShortTitleFormField(this.context.intl.formatMessage, appMessages),
+      ],
+    },
+  ]);
+
+  getBodyMainFields = () => ([{
+    fields: [getMarkdownField(this.context.intl.formatMessage, appMessages)],
+  }]);
+
+  getBodyAsideFields = (users, isAdmin, taxonomy) => {
+    const fields = []; // fieldGroups
+    fields.push({
+      fields: [getFormField(this.context.intl.formatMessage, appMessages, 'url', 'url')],
+    });
+    if (isAdmin && !!taxonomy.getIn(['attributes', 'has_manager'])) {
+      fields.push({
+        fields: [
+          renderUserControl(
+            users,
+            this.context.intl.formatMessage(appMessages.attributes.manager_id.categories)
+          ),
+        ],
+      });
+    }
+    return fields;
+  }
+
   render() {
-    const { taxonomy, dataReady, isAdmin, viewDomain } = this.props;
+    const { taxonomy, dataReady, isAdmin, viewDomain, users } = this.props;
     const { saveSending, saveError } = viewDomain.page;
     const taxonomyReference = this.props.params.id;
-    const required = (val) => val && val.length;
 
     let pageTitle = this.context.intl.formatMessage(messages.pageTitle);
-    if (taxonomy && taxonomy.attributes) {
-      pageTitle = `${pageTitle} (${taxonomy.attributes.title})`;
-    }
-
-    const mainAsideFields = [];
-    if (dataReady && isAdmin && !!taxonomy.attributes.has_manager && this.props.users) {
-      mainAsideFields.push(renderUserControl(this.props.users, 'Category manager'));
+    if (taxonomy && taxonomy.get('attributes')) {
+      pageTitle = `${pageTitle} (${taxonomy.getIn(['attributes', 'title'])})`;
     }
 
     return (
@@ -84,39 +122,35 @@ export class CategoryNew extends React.PureComponent { // eslint-disable-line re
             },
           ]}
         />
-        { !dataReady &&
-          <div>
-            <FormattedMessage {...messages.loading} />
-          </div>
-        }
-        {dataReady &&
-          <Page
+        <Content>
+          <ContentHeader
             title={pageTitle}
-            actions={
-              [
-                {
-                  type: 'simple',
-                  title: 'Cancel',
-                  onClick: () => this.props.handleCancel(taxonomyReference),
-                },
-                {
-                  type: 'primary',
-                  title: 'Save',
-                  onClick: () => this.props.handleSubmit(
-                    viewDomain.form.data,
-                    taxonomyReference
-                  ),
-                },
-              ]
+            type={CONTENT_SINGLE}
+            icon="measures"
+            buttons={
+              dataReady ? [{
+                type: 'cancel',
+                onClick: () => this.props.handleCancel(taxonomyReference),
+              },
+              {
+                type: 'save',
+                onClick: () => this.props.handleSubmit(
+                  viewDomain.form.data,
+                  taxonomyReference
+                ),
+              }] : null
             }
-          >
-            {saveSending &&
-              <p>Saving Category</p>
-            }
-            {saveError &&
-              <p>{saveError}</p>
-            }
-
+          />
+          { !dataReady &&
+            <Loading />
+          }
+          {saveSending &&
+            <Loading />
+          }
+          {saveError &&
+            <p>{saveError}</p>
+          }
+          {dataReady &&
             <EntityForm
               model="categoryNew.form.data"
               formData={viewDomain.form.data}
@@ -126,48 +160,18 @@ export class CategoryNew extends React.PureComponent { // eslint-disable-line re
               )}
               handleCancel={() => this.props.handleCancel(taxonomyReference)}
               handleUpdate={this.props.handleUpdate}
-              fields={{
+              fields={{ // isManager, taxonomies,
                 header: {
-                  main: [
-                    {
-                      id: 'title',
-                      controlType: 'input',
-                      model: '.attributes.title',
-                      placeholder: this.context.intl.formatMessage(messages.fields.title.placeholder),
-                      validators: {
-                        required,
-                      },
-                      errorMessages: {
-                        required: this.context.intl.formatMessage(messages.fieldRequired),
-                      },
-                    },
-                  ],
-                  aside: [],
+                  main: this.getHeaderMainFields(),
                 },
                 body: {
-                  main: [
-                    {
-                      id: 'description',
-                      controlType: 'textarea',
-                      model: '.attributes.description',
-                    },
-                    {
-                      id: 'short_title',
-                      controlType: 'input',
-                      model: '.attributes.short_title',
-                    },
-                    {
-                      id: 'url',
-                      controlType: 'input',
-                      model: '.attributes.url',
-                    },
-                  ],
-                  aside: mainAsideFields,
+                  main: this.getBodyMainFields(),
+                  aside: this.getBodyAsideFields(users, isAdmin, taxonomy),
                 },
               }}
             />
-          </Page>
-        }
+          }
+        </Content>
       </div>
     );
   }
@@ -188,47 +192,21 @@ CategoryNew.propTypes = {
 };
 
 CategoryNew.contextTypes = {
-  intl: React.PropTypes.object.isRequired,
+  intl: PropTypes.object.isRequired,
 };
 
 const mapStateToProps = (state, props) => ({
-  isAdmin: isUserAdmin(state),
-  viewDomain: viewDomainSelect(state),
-  dataReady: isReady(state, { path: [
-    'taxonomies',
-    'users',
-    'user_roles',
-  ] }),
-  taxonomy: getEntity(
-    state,
-    {
-      id: props.params.id,
-      path: 'taxonomies',
-      out: 'js',
-    },
-  ),
-  // all users of role manager
-  users: getEntities(
-    state,
-    {
-      path: 'users',
-      connected: {
-        path: 'user_roles',
-        key: 'user_id',
-        where: {
-          role_id: USER_ROLES.MANAGER,
-        },
-      },
-    },
-  ),
+  isAdmin: selectIsUserAdmin(state),
+  viewDomain: selectDomain(state),
+  dataReady: selectReady(state, { path: DEPENDENCIES }),
+  taxonomy: selectEntity(state, { path: 'taxonomies', id: props.params.id }),
+  users: selectUsers(state),
 });
 
 function mapDispatchToProps(dispatch) {
   return {
     loadEntitiesIfNeeded: () => {
-      dispatch(loadEntitiesIfNeeded('taxonomies'));
-      dispatch(loadEntitiesIfNeeded('users'));
-      dispatch(loadEntitiesIfNeeded('user_roles'));
+      DEPENDENCIES.forEach((path) => dispatch(loadEntitiesIfNeeded(path)));
     },
     redirectIfNotPermitted: () => {
       dispatch(redirectIfNotPermitted(USER_ROLES.MANAGER));

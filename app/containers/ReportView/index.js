@@ -4,133 +4,148 @@
  *
  */
 
-import React, { PropTypes } from 'react';
+import React from 'react';
+import PropTypes from 'prop-types';
 import { connect } from 'react-redux';
 import Helmet from 'react-helmet';
 import { FormattedMessage } from 'react-intl';
-import { find } from 'lodash/collection';
-
-import { loadEntitiesIfNeeded, updatePath } from 'containers/App/actions';
-
-import { PUBLISH_STATUSES } from 'containers/App/constants';
-
-import Page from 'components/Page';
-import EntityView from 'components/views/EntityView';
-import DocumentView from 'components/DocumentView';
 
 import {
-  getEntity,
-  isReady,
+  getTitleField,
+  getStatusField,
+  getMetaField,
+  getMarkdownField,
+  getDateRelatedField,
+  getDownloadField,
+} from 'utils/fields';
+
+import { loadEntitiesIfNeeded, updatePath, closeEntity } from 'containers/App/actions';
+
+import { CONTENT_SINGLE } from 'containers/App/constants';
+
+import Loading from 'components/Loading';
+import Content from 'components/Content';
+import ContentHeader from 'components/ContentHeader';
+import EntityView from 'components/EntityView';
+
+import {
+  selectReady,
+  selectIsUserContributor,
 } from 'containers/App/selectors';
 
+import appMessages from 'containers/App/messages';
 import messages from './messages';
+import { selectViewEntity } from './selectors';
+import { DEPENDENCIES } from './constants';
 
 export class ReportView extends React.PureComponent { // eslint-disable-line react/prefer-stateless-function
 
   componentWillMount() {
     this.props.loadEntitiesIfNeeded();
   }
+  componentWillReceiveProps(nextProps) {
+    // reload entities if invalidated
+    if (!nextProps.dataReady) {
+      this.props.loadEntitiesIfNeeded();
+    }
+  }
+  getHeaderMainFields = (entity, isManager) => ([ // fieldGroups
+    { // fieldGroup
+      fields: [
+        getTitleField(entity, isManager),
+      ],
+    },
+  ]);
+
+  getHeaderAsideFields = (entity) => ([
+    {
+      fields: [
+        getStatusField(entity),
+        getMetaField(entity, appMessages),
+      ],
+    },
+  ]);
+  getBodyMainFields = (entity, isContributor) => ([
+    {
+      fields: [
+        getMarkdownField(entity, 'description', true, appMessages),
+        getDownloadField(entity, isContributor, appMessages),
+      ],
+    },
+  ]);
+  getBodyAsideFields = (entity) => ([ // fieldGroups
+    {
+      type: 'dark',
+      fields: [
+        getDateRelatedField(entity.getIn(['date', 'attributes', 'due_date']), 'due_date_id', appMessages, true, appMessages.entities.progress_reports.unscheduled),
+      ],
+    },
+  ]);
+
 
   render() {
-    const { report, dataReady } = this.props;
-    const reference = this.props.params.id;
-    const status = report && find(PUBLISH_STATUSES, { value: report.attributes.draft });
+    const { viewEntity, dataReady, isContributor } = this.props;
 
     let pageTitle = this.context.intl.formatMessage(messages.pageTitle);
-
-    if (report) {
-      pageTitle = `${pageTitle} (Indicator: ${report.attributes.indicator_id})`;
+    if (viewEntity && dataReady) {
+      pageTitle = `${pageTitle} for indicator ${viewEntity.getIn(['attributes', 'indicator_id'])}`;
     }
 
     return (
       <div>
         <Helmet
-          title={`${this.context.intl.formatMessage(messages.pageTitle)}: ${reference}`}
+          title={`${this.context.intl.formatMessage(messages.pageTitle)}: ${this.props.params.id}`}
           meta={[
             { name: 'description', content: this.context.intl.formatMessage(messages.metaDescription) },
           ]}
         />
-        { !report && !dataReady &&
-          <div>
-            <FormattedMessage {...messages.loading} />
-          </div>
-        }
-        { !report && dataReady &&
-          <div>
-            <FormattedMessage {...messages.notFound} />
-          </div>
-        }
-        { report && dataReady &&
-          <Page
+        <Content>
+          <ContentHeader
             title={pageTitle}
-            actions={[
-              {
-                type: 'simple',
-                title: 'Edit',
-                onClick: this.props.handleEdit,
-              },
-              {
-                type: 'primary',
-                title: 'Close',
-                onClick: () => this.props.handleClose(this.props.report.indicator.id),
-              },
-            ]}
-          >
+            type={CONTENT_SINGLE}
+            icon="report"
+            buttons={isContributor
+              ? [
+                {
+                  type: 'edit',
+                  onClick: this.props.handleEdit,
+                },
+                {
+                  type: 'close',
+                  onClick: () => this.props.handleClose(viewEntity.getIn(['indicator', 'id'])),
+                },
+              ]
+              : [
+                {
+                  type: 'close',
+                  onClick: () => this.props.handleClose(viewEntity.getIn(['indicator', 'id'])),
+                },
+              ]
+             }
+          />
+          { !dataReady &&
+            <Loading />
+          }
+          { !viewEntity && dataReady &&
+            <div>
+              <FormattedMessage {...messages.notFound} />
+            </div>
+          }
+          { viewEntity && dataReady &&
             <EntityView
               fields={{
                 header: {
-                  main: [
-                    {
-                      id: 'title',
-                      value: report.attributes.title,
-                    },
-                  ],
-                  aside: [
-                    {
-                      id: 'number',
-                      heading: 'Number',
-                      value: reference,
-                    },
-                    {
-                      id: 'status',
-                      heading: 'Status',
-                      value: status && status.label,
-                    },
-                    {
-                      id: 'updated',
-                      heading: 'Updated At',
-                      value: report.attributes.updated_at,
-                    },
-                    {
-                      id: 'updated_by',
-                      heading: 'Updated By',
-                      value: report.user && report.user.attributes.name,
-                    },
-                  ],
+                  main: this.getHeaderMainFields(viewEntity, isContributor),
+                  aside: isContributor && this.getHeaderAsideFields(viewEntity),
                 },
                 body: {
-                  main: [
-                    report.date ? {
-                      id: 'date',
-                      heading: 'Scheduled Date',
-                      value: report.date.attributes.due_date,
-                    } : null,
-                    {
-                      id: 'description',
-                      heading: 'Description',
-                      value: report.attributes.description,
-                    },
-                    {
-                      id: 'document_url',
-                      heading: 'Document URL',
-                      value: <DocumentView url={report.attributes.document_url} status={report.attributes.document_public} />,
-                    },
-                  ],
+                  main: this.getBodyMainFields(viewEntity, isContributor),
+                  aside: isContributor ? this.getBodyAsideFields(viewEntity) : null,
                 },
               }}
             />
-          </Page>
-        }
+          }
+        </Content>
       </div>
     );
   }
@@ -140,66 +155,32 @@ ReportView.propTypes = {
   loadEntitiesIfNeeded: PropTypes.func,
   handleClose: PropTypes.func,
   handleEdit: PropTypes.func,
-  report: PropTypes.object,
+  viewEntity: PropTypes.object,
   dataReady: PropTypes.bool,
+  isContributor: PropTypes.bool,
   params: PropTypes.object,
 };
 
 ReportView.contextTypes = {
-  intl: React.PropTypes.object.isRequired,
+  intl: PropTypes.object.isRequired,
 };
 
 const mapStateToProps = (state, props) => ({
-  dataReady: isReady(state, { path: [
-    'progress_reports',
-    'users',
-    'indicators',
-    'due_dates',
-  ] }),
-  report: getEntity(
-    state,
-    {
-      id: props.params.id,
-      path: 'progress_reports',
-      out: 'js',
-      extend: [
-        {
-          type: 'single',
-          path: 'users',
-          key: 'last_modified_user_id',
-          as: 'user',
-        },
-        {
-          type: 'single',
-          path: 'indicators',
-          key: 'indicator_id',
-          as: 'indicator',
-        },
-        {
-          type: 'single',
-          path: 'due_dates',
-          key: 'due_date_id',
-          as: 'date',
-        },
-      ],
-    },
-  ),
+  isContributor: selectIsUserContributor(state),
+  dataReady: selectReady(state, { path: DEPENDENCIES }),
+  viewEntity: selectViewEntity(state, props.params.id),
 });
 
 function mapDispatchToProps(dispatch, props) {
   return {
     loadEntitiesIfNeeded: () => {
-      dispatch(loadEntitiesIfNeeded('indicators'));
-      dispatch(loadEntitiesIfNeeded('progress_reports'));
-      dispatch(loadEntitiesIfNeeded('users'));
-      dispatch(loadEntitiesIfNeeded('due_dates'));
+      DEPENDENCIES.forEach((path) => dispatch(loadEntitiesIfNeeded(path)));
     },
     handleEdit: () => {
       dispatch(updatePath(`/reports/edit/${props.params.id}`));
     },
     handleClose: (indicatorId) => {
-      dispatch(updatePath(`/indicators/${indicatorId}`));
-      // TODO should be "go back" if history present or to reports list when not
+      dispatch(closeEntity(`/indicators/${indicatorId}`));
     },
   };
 }

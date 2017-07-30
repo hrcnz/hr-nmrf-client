@@ -3,13 +3,15 @@
  *
  */
 import React from 'react';
+import PropTypes from 'prop-types';
 import { connect } from 'react-redux';
-import { FormattedMessage } from 'react-intl';
+// import { FormattedMessage } from 'react-intl';
 import Helmet from 'react-helmet';
+import Loading from 'components/Loading';
+import ContentNarrow from 'components/ContentNarrow';
+import ContentHeader from 'components/ContentHeader';
 
 import { logout } from 'containers/App/actions';
-
-import Page from 'components/Page';
 
 import messages from './messages';
 
@@ -31,34 +33,32 @@ export class UserLogout extends React.PureComponent { // eslint-disable-line rea
             },
           ]}
         />
-        <Page
-          title={this.context.intl.formatMessage(messages.pageTitle)}
-          actions={[]}
-        >
-          <FormattedMessage {...messages.header} />
-        </Page>
+        <ContentNarrow>
+          <ContentHeader
+            title={this.context.intl.formatMessage(messages.pageTitle)}
+          />
+          <Loading />
+        </ContentNarrow>
       </div>
     );
   }
 }
 
 UserLogout.propTypes = {
-  doLogout: React.PropTypes.func,
+  doLogout: PropTypes.func,
 };
 
 UserLogout.contextTypes = {
-  intl: React.PropTypes.object.isRequired,
+  intl: PropTypes.object.isRequired,
 };
 
 export function mapDispatchToProps(dispatch) {
   return {
-    doLogout: (evt) => {
-      if (evt !== undefined && evt.preventDefault) evt.preventDefault();
+    doLogout: () => {
       dispatch(logout());
     },
   };
 }
-
 
 // Wrap the component to inject dispatch and state into it
 export default connect(null, mapDispatchToProps)(UserLogout);

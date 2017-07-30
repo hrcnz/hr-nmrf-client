@@ -4,19 +4,23 @@
  *
  */
 
-import React, { PropTypes } from 'react';
+import React from 'react';
+import PropTypes from 'prop-types';
 import { connect } from 'react-redux';
 import Helmet from 'react-helmet';
-// import { FormattedMessage } from 'react-intl';
 
-import Page from 'components/Page';
-import SimpleForm from 'components/forms/SimpleForm';
+import Loading from 'components/Loading';
+import ContentNarrow from 'components/ContentNarrow';
+import ContentHeader from 'components/ContentHeader';
+import AuthForm from 'components/forms/AuthForm';
 
 import { updatePath } from 'containers/App/actions';
-import userPasswordSelector from './selectors';
-import messages from './messages';
-import { save } from './actions';
 
+import appMessages from 'containers/App/messages';
+import messages from './messages';
+
+import { save } from './actions';
+import userPasswordSelector from './selectors';
 
 export class UserPassword extends React.PureComponent { // eslint-disable-line react/prefer-stateless-function
   render() {
@@ -35,79 +39,66 @@ export class UserPassword extends React.PureComponent { // eslint-disable-line r
             },
           ]}
         />
-        <Page
-          title={this.context.intl.formatMessage(messages.pageTitle)}
-          actions={
-            [
-              {
-                type: 'simple',
-                title: 'Cancel',
-                onClick: () => this.props.handleCancel(reference),
-              },
-              {
-                type: 'primary',
-                title: 'Update',
-                onClick: () => this.props.handleSubmit(
-                  this.props.userPassword.form.data,
-                  reference
-                ),
-              },
-            ]
-          }
-        >
+        <ContentNarrow>
+          <ContentHeader
+            title={this.context.intl.formatMessage(messages.pageTitle)}
+          />
           {passwordSending &&
-            <p>Sending... </p>
+            <Loading />
           }
           {passwordError &&
             <p>{passwordError}</p>
           }
           { this.props.userPassword.form &&
-            <SimpleForm
+            <AuthForm
               model="userPassword.form.data"
               handleSubmit={(formData) => this.props.handleSubmit(formData, reference)}
               handleCancel={() => this.props.handleCancel(reference)}
-              labels={{ submit: 'Submit' }}
+              labels={{ submit: this.context.intl.formatMessage(messages.submit) }}
               fields={[
                 {
                   id: 'password',
                   controlType: 'input',
+                  type: 'password',
                   model: '.attributes.password',
                   placeholder: this.context.intl.formatMessage(messages.fields.password.placeholder),
                   validators: {
                     required,
                   },
                   errorMessages: {
-                    required: this.context.intl.formatMessage(messages.fieldRequired),
+                    required: this.context.intl.formatMessage(appMessages.forms.fieldRequired),
                   },
                 },
                 {
                   id: 'passwordNew',
                   controlType: 'input',
                   model: '.attributes.passwordNew',
+                  type: 'password',
                   placeholder: this.context.intl.formatMessage(messages.fields.passwordNew.placeholder),
                   validators: {
                     required,
                   },
                   errorMessages: {
-                    required: this.context.intl.formatMessage(messages.fieldRequired),
+                    required: this.context.intl.formatMessage(appMessages.forms.fieldRequired),
                   },
                 },
                 {
                   id: 'passwordConfirmation',
                   controlType: 'input',
                   model: '.attributes.passwordConfirmation',
+                  type: 'password',
                   placeholder: this.context.intl.formatMessage(messages.fields.passwordConfirmation.placeholder),
                   validators: {
                     required,
                   },
                   errorMessages: {
-                    required: this.context.intl.formatMessage(messages.fieldRequired),
+                    required: this.context.intl.formatMessage(appMessages.forms.fieldRequired),
                   },
                 },
               ]}
             />
           }
-        </Page>
+        </ContentNarrow>
       </div>
     );
   }
@@ -121,7 +112,7 @@ UserPassword.propTypes = {
 };
 
 UserPassword.contextTypes = {
-  intl: React.PropTypes.object.isRequired,
+  intl: PropTypes.object.isRequired,
 };
 
 const mapStateToProps = (state) => ({

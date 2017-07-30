@@ -4,40 +4,77 @@
  *
  */
 
-import React, { PropTypes } from 'react';
+import React from 'react';
+import PropTypes from 'prop-types';
 import { connect } from 'react-redux';
 import Helmet from 'react-helmet';
-// import { FormattedMessage } from 'react-intl';
-
-import { PUBLISH_STATUSES, USER_ROLES } from 'containers/App/constants';
 
 import {
+  getTitleFormField,
+  getMenuTitleFormField,
+  getMarkdownField,
+  getStatusField,
+} from 'utils/forms';
+
+import { USER_ROLES, CONTENT_SINGLE } from 'containers/App/constants';
+import appMessages from 'containers/App/messages';
+
+import {
+  loadEntitiesIfNeeded,
   redirectIfNotPermitted,
   updatePath,
   updateEntityForm,
 } from 'containers/App/actions';
+import { selectReady } from 'containers/App/selectors';
 
-import Page from 'components/Page';
+import Loading from 'components/Loading';
+import Content from 'components/Content';
+import ContentHeader from 'components/ContentHeader';
 import EntityForm from 'components/forms/EntityForm';
 
-import { isReady } from 'containers/App/selectors';
-
-import viewDomainSelect from './selectors';
+import { selectDomain } from './selectors';
 
 import messages from './messages';
 import { save } from './actions';
+import { DEPENDENCIES } from './constants';
 
 
 export class PageNew extends React.PureComponent { // eslint-disable-line react/prefer-stateless-function
+
+  componentWillMount() {
+    this.props.loadEntitiesIfNeeded();
+  }
+
   componentWillReceiveProps(nextProps) {
+    // reload entities if invalidated
+    if (!nextProps.dataReady) {
+      this.props.loadEntitiesIfNeeded();
+    }
     if (nextProps.dataReady && !this.props.dataReady) {
       this.props.redirectIfNotPermitted();
     }
   }
+
+  getHeaderMainFields = () => ([ // fieldGroups
+    { // fieldGroup
+      fields: [
+        getTitleFormField(this.context.intl.formatMessage, appMessages),
+        getMenuTitleFormField(this.context.intl.formatMessage, appMessages),
+      ],
+    },
+  ]);
+
+  getHeaderAsideFields = () => ([{
+    fields: [getStatusField(this.context.intl.formatMessage, appMessages)],
+  }]);
+
+  getBodyMainFields = () => ([{
+    fields: [getMarkdownField(this.context.intl.formatMessage, appMessages, 'content')],
+  }]);
+
   render() {
-    const { viewDomain } = this.props;
+    const { viewDomain, dataReady } = this.props;
     const { saveSending, saveError } = viewDomain.page;
-    const required = (val) => val && val.length;
 
     return (
       <div>
@@ -50,87 +87,57 @@ export class PageNew extends React.PureComponent { // eslint-disable-line react/
             },
           ]}
         />
-        <Page
-          title={this.context.intl.formatMessage(messages.pageTitle)}
-          actions={
-            [
-              {
-                type: 'simple',
-                title: 'Cancel',
+        <Content>
+          <ContentHeader
+            title={this.context.intl.formatMessage(messages.pageTitle)}
+            type={CONTENT_SINGLE}
+            icon="categories"
+            buttons={
+              dataReady ? [{
+                type: 'cancel',
                 onClick: this.props.handleCancel,
               },
               {
-                type: 'primary',
-                title: 'Save',
-                onClick: () => this.props.handleSubmit(
-                  viewDomain.form.data,
-                ),
-              },
-            ]
-          }
-        >
+                type: 'save',
+                onClick: () => this.props.handleSubmit(viewDomain.form.data),
+              }] : null
+            }
+          />
           {saveSending &&
-            <p>Saving Page</p>
+            <Loading />
           }
           {saveError &&
             <p>{saveError}</p>
           }
-          <EntityForm
-            model="pageNew.form.data"
-            formData={viewDomain.form.data}
-            handleSubmit={(formData) => this.props.handleSubmit(formData)}
-            handleCancel={this.props.handleCancel}
-            handleUpdate={this.props.handleUpdate}
-            fields={{
-              header: {
-                main: [
-                  {
-                    id: 'title',
-                    controlType: 'input',
-                    model: '.attributes.title',
-                    placeholder: this.context.intl.formatMessage(messages.fields.title.placeholder),
-                    validators: {
-                      required,
-                    },
-                    errorMessages: {
-                      required: this.context.intl.formatMessage(messages.fieldRequired),
-                    },
-                  },
-                  {
-                    id: 'menuTitle',
-                    controlType: 'input',
-                    label: 'Menu title',
-                    model: '.attributes.menu_title',
-                  },
-                ],
-                aside: [
-                  {
-                    id: 'status',
-                    controlType: 'select',
-                    model: '.attributes.draft',
-                    options: PUBLISH_STATUSES,
-                  },
-                ],
-              },
-              body: {
-                main: [
-                  {
-                    id: 'content',
-                    controlType: 'textarea',
-                    model: '.attributes.content',
-                  },
-                ],
-                aside: [],
-              },
-            }}
-          />
-        </Page>
+          { !dataReady &&
+            <Loading />
+          }
+          {dataReady &&
+            <EntityForm
+              model="pageNew.form.data"
+              formData={viewDomain.form.data}
+              handleSubmit={(formData) => this.props.handleSubmit(formData)}
+              handleCancel={this.props.handleCancel}
+              handleUpdate={this.props.handleUpdate}
+              fields={{
+                header: {
+                  main: this.getHeaderMainFields(),
+                  aside: this.getHeaderAsideFields(),
+                },
+                body: {
+                  main: this.getBodyMainFields(),
+                },
+              }}
+            />
+          }
+        </Content>
       </div>
     );
   }
 }
 
 PageNew.propTypes = {
+  loadEntitiesIfNeeded: PropTypes.func.isRequired,
   redirectIfNotPermitted: PropTypes.func,
   handleSubmit: PropTypes.func.isRequired,
   handleCancel: PropTypes.func.isRequired,
@@ -140,18 +147,19 @@ PageNew.propTypes = {
 };
 
 PageNew.contextTypes = {
-  intl: React.PropTypes.object.isRequired,
+  intl: PropTypes.object.isRequired,
 };
 
 const mapStateToProps = (state) => ({
-  viewDomain: viewDomainSelect(state),
-  dataReady: isReady(state, { path: [
-    'user_roles',
-  ] }),
+  viewDomain: selectDomain(state),
+  dataReady: selectReady(state, { path: DEPENDENCIES }),
 });
 
 function mapDispatchToProps(dispatch) {
   return {
+    loadEntitiesIfNeeded: () => {
+      DEPENDENCIES.forEach((path) => dispatch(loadEntitiesIfNeeded(path)));
+    },
     redirectIfNotPermitted: () => {
       dispatch(redirectIfNotPermitted(USER_ROLES.ADMIN));
     },

@@ -1,11 +1,12 @@
 import React from 'react';
+import PropTypes from 'prop-types';
 import { FormattedMessage } from 'react-intl';
 import styled from 'styled-components';
 import { palette } from 'styled-theme';
 import Grid from 'grid-styled';
 
-import Container from 'components/basic/Container';
-import Row from 'components/basic/Row';
+import Container from 'components/styled/Container';
+import Row from 'components/styled/Row';
 
 import appMessages from 'containers/App/messages';
 import messages from './messages';
@@ -16,7 +17,7 @@ import LinkPage from './LinkPage';
 import BrandTitle from './BrandTitle';
 
 const Styled = styled.div`
-  background-color: ${palette('primary', 2)};
+  background-color: ${palette('secondary', 1)};
   color: ${palette('primary', 4)};
 `;
 const Main = styled.div`
@@ -32,7 +33,7 @@ font-weight:bold;
 `;
 
 
-class Footer extends React.Component { // eslint-disable-line react/prefer-stateless-function
+class Footer extends React.PureComponent { // eslint-disable-line react/prefer-stateless-function
 
   onClick = (evt, path) => {
     if (evt !== undefined && evt.preventDefault) evt.preventDefault();
@@ -110,12 +111,12 @@ class Footer extends React.Component { // eslint-disable-line react/prefer-state
 }
 
 Footer.propTypes = {
-  pages: React.PropTypes.array,
-  onPageLink: React.PropTypes.func.isRequired,
+  pages: PropTypes.array,
+  onPageLink: PropTypes.func.isRequired,
 };
 
 Footer.contextTypes = {
-  intl: React.PropTypes.object.isRequired,
+  intl: PropTypes.object.isRequired,
 };
 
 export default Footer;
