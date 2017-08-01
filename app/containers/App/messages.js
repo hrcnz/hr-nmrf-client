@@ -43,7 +43,7 @@ export default defineMessages({
     },
     assign: {
       id: 'app.containers.App.buttons.assign',
-      defaultMessage: 'Assign',
+      defaultMessage: 'Update',
     },
   },
   forms: {
@@ -302,6 +302,10 @@ export default defineMessages({
     showLess: {
       id: 'app.containers.App.entities.showLess',
       defaultMessage: 'Show less',
+    },
+    connected: {
+      id: 'app.containers.App.entities.connected',
+      defaultMessage: '(inferred)',
     },
     recommendations: {
       single: {
