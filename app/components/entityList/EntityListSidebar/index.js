@@ -33,12 +33,18 @@ import messages from './messages';
 
 const Styled = styled.div``;
 const Main = styled.div``;
+const ScrollableWrapper = styled(Scrollable)`
+  background-color: ${palette('light', 0)};
+`;
 const Header = styled.div`
   padding: 3em 2em 1em;
-  background-color: ${palette('light', 2)}
+  background-color: ${palette('light', 2)};
 `;
 const ListEntitiesEmpty = styled.div`
-  padding: 3em 2em 1em;
+  font-size: 1.2em;
+  padding: 1.5em;
+  color: ${palette('light', 4)};
+  font-weight: 500;
 `;
 
 export class EntityListSidebar extends React.Component { // eslint-disable-line react/prefer-stateless-function
@@ -50,16 +56,19 @@ export class EntityListSidebar extends React.Component { // eslint-disable-line 
     };
   }
   componentWillMount() {
+    // console.log('componentWIllMount')
     this.setState({ activeOption: null });
   }
 
   componentWillReceiveProps(nextProps) {
     if (nextProps.activePanel !== this.props.activePanel) {
       // close and reset option panel
+      // console.log('componentWillReceiveProps')
       this.setState({ activeOption: null });
     }
   }
   shouldComponentUpdate(nextProps, nextState) {
+    // console.log('shouldComponentUpdate')
     // console.log('locationQuery', isEqual(this.props.locationQuery, nextProps.locationQuery))
     // console.log('locationQuery', this.props.locationQuery === nextProps.locationQuery)
     // console.log('locationQuery.where',!isEqual(this.props.locationQuery.where, nextProps.locationQuery.where))
@@ -73,6 +82,8 @@ export class EntityListSidebar extends React.Component { // eslint-disable-line 
     return this.props.locationQuery !== nextProps.locationQuery
       || this.props.entityIdsSelected !== nextProps.entityIdsSelected
       || this.props.activePanel !== nextProps.activePanel
+      || this.props.taxonomies !== nextProps.taxonomies
+      || this.props.connections !== nextProps.connections
       || !isEqual(this.state, nextState);
   }
 
@@ -98,7 +109,14 @@ export class EntityListSidebar extends React.Component { // eslint-disable-line 
     },
   ]);
 
-  getFormButtons = () => [
+  getFormButtons = (activeOption) => [
+    activeOption.create
+    ? {
+      type: 'addFromMultiselect',
+      position: 'left',
+      onClick: () => this.props.onCreateOption(activeOption.create),
+    }
+    : null,
     {
       type: 'simple',
       title: this.context.intl.formatMessage(appMessages.buttons.cancel),
@@ -108,7 +126,6 @@ export class EntityListSidebar extends React.Component { // eslint-disable-line 
       type: 'primary',
       title: this.context.intl.formatMessage(appMessages.buttons.assign),
       submit: true,
-      // TODO consider making button inactive when form unchanged
     },
   ];
 
@@ -129,6 +146,7 @@ export class EntityListSidebar extends React.Component { // eslint-disable-line 
     } = this.props;
 
     const activeOption = this.state.activeOption;
+
     const hasSelected = entityIdsSelected && entityIdsSelected.size > 0;
     const hasEntities = entities && entities.size > 0;
     const formModel = activePanel === FILTERS_PANEL ? FILTER_FORM_MODEL : EDIT_FORM_MODEL;
@@ -186,6 +204,7 @@ export class EntityListSidebar extends React.Component { // eslint-disable-line 
           activeOption,
           taxonomies,
           connections,
+          connectedTaxonomies,
           {
             title: `${this.context.intl.formatMessage(messages.editFormTitlePrefix)} ${entitiesSelected.size} ${this.context.intl.formatMessage(messages.editFormTitlePostfix)}`,
           }
@@ -195,7 +214,7 @@ export class EntityListSidebar extends React.Component { // eslint-disable-line 
 
     return (
       <Styled>
-        <Scrollable>
+        <ScrollableWrapper>
           <Header>
             {canEdit &&
               <ButtonToggle
@@ -225,16 +244,17 @@ export class EntityListSidebar extends React.Component { // eslint-disable-line 
               </ListEntitiesEmpty>
             }
           </Main>
-        </Scrollable>
+        </ScrollableWrapper>
         { formOptions &&
           <EntityListForm
             model={formModel}
+            activeOptionId={activeOption.optionId}
             formOptions={formOptions}
             buttons={activePanel === EDIT_PANEL
-              ? this.getFormButtons()
+              ? this.getFormButtons(activeOption)
               : null
             }
-            onCancel={this.onHideForm}
+            onCancel={(activePanel === FILTERS_PANEL) ? this.onHideForm : null}
             onSelect={() => {
               if (activePanel === FILTERS_PANEL) {
                 this.onHideForm();
@@ -267,6 +287,7 @@ EntityListSidebar.propTypes = {
   onAssign: PropTypes.func.isRequired,
   onPanelSelect: PropTypes.func.isRequired,
   formatLabel: PropTypes.func.isRequired,
+  onCreateOption: PropTypes.func.isRequired,
 };
 
 EntityListSidebar.contextTypes = {

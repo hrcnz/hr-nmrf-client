@@ -4,6 +4,7 @@
  *
  */
 import { fromJS } from 'immutable';
+import { REPORT_FREQUENCIES } from 'containers/App/constants';
 
 export const SAVE = 'nmrf/IndicatorEdit/SAVE';
 
@@ -15,6 +16,10 @@ export const DEPENDENCIES = [
   'indicators',
   'measure_indicators',
   'sdgtarget_indicators',
+  'measure_categories',
+  'sdgtarget_categories',
+  'taxonomies',
+  'categories',
 ];
 
 export const FORM_INITIAL = fromJS({
@@ -22,11 +27,11 @@ export const FORM_INITIAL = fromJS({
   attributes: {
     title: '',
     description: '',
-    draft: '',
+    draft: true,
     manager_id: '',
-    frequency_months: 1,
+    frequency_months: REPORT_FREQUENCIES[0] ? REPORT_FREQUENCIES[0].value : '',
     start_date: '',
-    repeat: '',
+    repeat: false,
     end_date: '',
     reference: '',
   },

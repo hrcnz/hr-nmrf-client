@@ -16,6 +16,7 @@ import { Map } from 'immutable';
 import {
   getTitleFormField,
   getMenuTitleFormField,
+  getMenuOrderFormField,
   getMarkdownField,
   getStatusField,
 } from 'utils/forms';
@@ -33,10 +34,13 @@ import {
   updatePath,
   updateEntityForm,
   deleteEntity,
+  submitInvalid,
+  saveErrorDismiss,
   } from 'containers/App/actions';
 
 import { selectReady, selectIsUserAdmin } from 'containers/App/selectors';
 
+import ErrorMessages from 'components/ErrorMessages';
 import Loading from 'components/Loading';
 import Content from 'components/Content';
 import ContentHeader from 'components/ContentHeader';
@@ -56,7 +60,7 @@ export class PageEdit extends React.Component { // eslint-disable-line react/pre
   componentWillMount() {
     this.props.loadEntitiesIfNeeded();
     if (this.props.dataReady && this.props.viewEntity) {
-      this.props.populateForm('pageEdit.form.data', this.getInitialFormData());
+      this.props.initialiseForm('pageEdit.form.data', this.getInitialFormData());
     }
   }
 
@@ -68,7 +72,7 @@ export class PageEdit extends React.Component { // eslint-disable-line react/pre
     // repopulate if new data becomes ready
     if (nextProps.dataReady && !this.props.dataReady && nextProps.viewEntity) {
       this.props.redirectIfNotPermitted();
-      this.props.populateForm('pageEdit.form.data', this.getInitialFormData(nextProps));
+      this.props.initialiseForm('pageEdit.form.data', this.getInitialFormData(nextProps));
     }
   }
 
@@ -91,6 +95,7 @@ export class PageEdit extends React.Component { // eslint-disable-line react/pre
       fields: [
         getTitleFormField(this.context.intl.formatMessage, appMessages),
         getMenuTitleFormField(this.context.intl.formatMessage, appMessages),
+        getMenuOrderFormField(this.context.intl.formatMessage, appMessages),
       ],
     },
   ]);
@@ -111,7 +116,7 @@ export class PageEdit extends React.Component { // eslint-disable-line react/pre
   render() {
     const { viewEntity, dataReady, viewDomain } = this.props;
     const reference = this.props.params.id;
-    const { saveSending, saveError, deleteSending, deleteError } = viewDomain.page;
+    const { saveSending, saveError, deleteSending, deleteError, submitValid } = viewDomain.page;
 
     return (
       <div>
@@ -132,18 +137,27 @@ export class PageEdit extends React.Component { // eslint-disable-line react/pre
               },
               {
                 type: 'save',
-                onClick: () => this.props.handleSubmit(viewDomain.form.data),
+                onClick: () => this.props.handleSubmitRemote('pageEdit.form.data'),
               }] : null
             }
           />
-          {(saveSending || deleteSending || !dataReady) &&
-            <Loading />
-          }
-          {deleteError &&
-            <p>{deleteError}</p>
+          {!submitValid &&
+            <ErrorMessages
+              error={{ messages: [this.context.intl.formatMessage(appMessages.forms.multipleErrors)] }}
+              onDismiss={this.props.onErrorDismiss}
+            />
           }
           {saveError &&
-            <p>{saveError}</p>
+            <ErrorMessages
+              error={saveError}
+              onDismiss={this.props.onServerErrorDismiss}
+            />
+          }
+          {deleteError &&
+            <ErrorMessages error={deleteError} />
+          }
+          {(saveSending || deleteSending || !dataReady) &&
+            <Loading />
           }
           {!viewEntity && dataReady && !saveError && !deleteSending &&
             <div>
@@ -155,6 +169,7 @@ export class PageEdit extends React.Component { // eslint-disable-line react/pre
               model="pageEdit.form.data"
               formData={viewDomain.form.data}
               handleSubmit={(formData) => this.props.handleSubmit(formData)}
+              handleSubmitFail={this.props.handleSubmitFail}
               handleCancel={this.props.handleCancel}
               handleUpdate={this.props.handleUpdate}
               handleDelete={this.props.isUserAdmin ? this.props.handleDelete : null}
@@ -178,7 +193,9 @@ export class PageEdit extends React.Component { // eslint-disable-line react/pre
 PageEdit.propTypes = {
   loadEntitiesIfNeeded: PropTypes.func,
   redirectIfNotPermitted: PropTypes.func,
-  populateForm: PropTypes.func,
+  initialiseForm: PropTypes.func,
+  handleSubmitRemote: PropTypes.func.isRequired,
+  handleSubmitFail: PropTypes.func.isRequired,
   handleSubmit: PropTypes.func.isRequired,
   handleCancel: PropTypes.func.isRequired,
   handleUpdate: PropTypes.func.isRequired,
@@ -188,6 +205,8 @@ PageEdit.propTypes = {
   isUserAdmin: PropTypes.bool,
   params: PropTypes.object,
   viewEntity: PropTypes.object,
+  onErrorDismiss: PropTypes.func.isRequired,
+  onServerErrorDismiss: PropTypes.func.isRequired,
 };
 
 PageEdit.contextTypes = {
@@ -209,8 +228,21 @@ function mapDispatchToProps(dispatch, props) {
     redirectIfNotPermitted: () => {
       dispatch(redirectIfNotPermitted(USER_ROLES.ADMIN));
     },
-    populateForm: (model, formData) => {
-      dispatch(formActions.load(model, formData));
+    initialiseForm: (model, formData) => {
+      dispatch(formActions.reset(model));
+      dispatch(formActions.change(model, formData, { silent: true }));
+    },
+    onErrorDismiss: () => {
+      dispatch(submitInvalid(true));
+    },
+    onServerErrorDismiss: () => {
+      dispatch(saveErrorDismiss());
+    },
+    handleSubmitFail: () => {
+      dispatch(submitInvalid(false));
+    },
+    handleSubmitRemote: (model) => {
+      dispatch(formActions.submit(model));
     },
     handleSubmit: (formData) => {
       dispatch(save(formData.toJS()));

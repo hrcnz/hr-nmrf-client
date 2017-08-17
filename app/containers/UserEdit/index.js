@@ -31,6 +31,8 @@ import {
   loadEntitiesIfNeeded,
   updatePath,
   updateEntityForm,
+  submitInvalid,
+  saveErrorDismiss,
 } from 'containers/App/actions';
 
 import {
@@ -41,6 +43,7 @@ import {
 import { CONTENT_SINGLE } from 'containers/App/constants';
 import appMessages from 'containers/App/messages';
 
+import ErrorMessages from 'components/ErrorMessages';
 import Loading from 'components/Loading';
 import Content from 'components/Content';
 import ContentHeader from 'components/ContentHeader';
@@ -62,7 +65,7 @@ export class UserEdit extends React.PureComponent { // eslint-disable-line react
   componentWillMount() {
     this.props.loadEntitiesIfNeeded();
     if (this.props.dataReady && this.props.viewEntity) {
-      this.props.populateForm('userEdit.form.data', this.getInitialFormData());
+      this.props.initialiseForm('userEdit.form.data', this.getInitialFormData());
     }
   }
 
@@ -72,7 +75,7 @@ export class UserEdit extends React.PureComponent { // eslint-disable-line react
       this.props.loadEntitiesIfNeeded();
     }
     if (nextProps.dataReady && !this.props.dataReady && nextProps.viewEntity) {
-      this.props.populateForm('userEdit.form.data', this.getInitialFormData(nextProps));
+      this.props.initialiseForm('userEdit.form.data', this.getInitialFormData(nextProps));
     }
   }
 
@@ -123,7 +126,7 @@ export class UserEdit extends React.PureComponent { // eslint-disable-line react
   render() {
     const { viewEntity, dataReady, viewDomain, taxonomies, roles, isManager } = this.props;
     const reference = this.props.params.id;
-    const { saveSending, saveError } = viewDomain.page;
+    const { saveSending, saveError, submitValid } = viewDomain.page;
 
     return (
       <div>
@@ -145,21 +148,23 @@ export class UserEdit extends React.PureComponent { // eslint-disable-line react
               },
               {
                 type: 'save',
-                onClick: () => this.props.handleSubmit(
-                  viewDomain.form.data,
-                  taxonomies,
-                  roles,
-                ),
+                onClick: () => this.props.handleSubmitRemote('userEdit.form.data'),
               }]
             }
           />
-          {saveSending &&
-            <Loading />
+          {!submitValid &&
+            <ErrorMessages
+              error={{ messages: [this.context.intl.formatMessage(appMessages.forms.multipleErrors)] }}
+              onDismiss={this.props.onErrorDismiss}
+            />
           }
           {saveError &&
-            <p>{saveError}</p>
+            <ErrorMessages
+              error={saveError}
+              onDismiss={this.props.onServerErrorDismiss}
+            />
           }
-          { !dataReady &&
+          {(saveSending || !dataReady) &&
             <Loading />
           }
           {!viewEntity && dataReady && !saveError &&
@@ -176,6 +181,7 @@ export class UserEdit extends React.PureComponent { // eslint-disable-line react
                 taxonomies,
                 roles,
               )}
+              handleSubmitFail={this.props.handleSubmitFail}
               handleCancel={() => this.props.handleCancel(reference)}
               handleUpdate={this.props.handleUpdate}
               fields={{
@@ -198,7 +204,9 @@ export class UserEdit extends React.PureComponent { // eslint-disable-line react
 
 UserEdit.propTypes = {
   loadEntitiesIfNeeded: PropTypes.func,
-  populateForm: PropTypes.func,
+  initialiseForm: PropTypes.func,
+  handleSubmitRemote: PropTypes.func.isRequired,
+  handleSubmitFail: PropTypes.func.isRequired,
   handleSubmit: PropTypes.func.isRequired,
   handleCancel: PropTypes.func.isRequired,
   handleUpdate: PropTypes.func.isRequired,
@@ -209,6 +217,8 @@ UserEdit.propTypes = {
   dataReady: PropTypes.bool,
   isManager: PropTypes.bool,
   params: PropTypes.object,
+  onErrorDismiss: PropTypes.func.isRequired,
+  onServerErrorDismiss: PropTypes.func.isRequired,
 };
 
 UserEdit.contextTypes = {
@@ -229,8 +239,21 @@ function mapDispatchToProps(dispatch) {
     loadEntitiesIfNeeded: () => {
       DEPENDENCIES.forEach((path) => dispatch(loadEntitiesIfNeeded(path)));
     },
-    populateForm: (model, formData) => {
-      dispatch(formActions.load(model, formData));
+    initialiseForm: (model, formData) => {
+      dispatch(formActions.reset(model));
+      dispatch(formActions.change(model, formData, { silent: true }));
+    },
+    onErrorDismiss: () => {
+      dispatch(submitInvalid(true));
+    },
+    onServerErrorDismiss: () => {
+      dispatch(saveErrorDismiss());
+    },
+    handleSubmitFail: () => {
+      dispatch(submitInvalid(false));
+    },
+    handleSubmitRemote: (model) => {
+      dispatch(formActions.submit(model));
     },
     handleSubmit: (formData, taxonomies, roles) => {
       let saveData = formData

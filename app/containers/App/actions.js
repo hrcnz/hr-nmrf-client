@@ -43,6 +43,7 @@ import {
   SAVE_SENDING,
   SAVE_SUCCESS,
   SAVE_ERROR,
+  SAVE_ERROR_DISMISS,
   DELETE_SENDING,
   DELETE_SUCCESS,
   DELETE_ERROR,
@@ -60,8 +61,23 @@ import {
   RECOVER_SUCCESS,
   RECOVER_ERROR,
   CLOSE_ENTITY,
+  OPEN_NEW_ENTITY_MODAL,
+  RESET_PROGRESS,
+  SUBMIT_INVALID,
 } from './constants';
 
+export function submitInvalid(valid) {
+  return {
+    type: SUBMIT_INVALID,
+    valid,
+  };
+}
+
+export function resetProgress() {
+  return {
+    type: RESET_PROGRESS,
+  };
+}
 
 export function saveSending(data) {
   return {
@@ -74,6 +90,12 @@ export function saveSuccess(data) {
   return {
     type: SAVE_SUCCESS,
     data,
+  };
+}
+
+export function saveErrorDismiss() {
+  return {
+    type: SAVE_ERROR_DISMISS,
   };
 }
 
@@ -441,5 +463,12 @@ export function closeEntity(path) {
   return {
     type: CLOSE_ENTITY,
     path,
+  };
+}
+
+export function openNewEntityModal(args) {
+  return {
+    type: OPEN_NEW_ENTITY_MODAL,
+    args,
   };
 }

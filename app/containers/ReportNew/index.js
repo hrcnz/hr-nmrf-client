@@ -8,6 +8,7 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import { connect } from 'react-redux';
 import Helmet from 'react-helmet';
+import { actions as formActions } from 'react-redux-form/immutable';
 
 import {
   getTitleFormField,
@@ -25,10 +26,13 @@ import {
   loadEntitiesIfNeeded,
   updatePath,
   updateEntityForm,
+  submitInvalid,
+  saveErrorDismiss,
 } from 'containers/App/actions';
 
 import { selectReady } from 'containers/App/selectors';
 
+import ErrorMessages from 'components/ErrorMessages';
 import Loading from 'components/Loading';
 import Content from 'components/Content';
 import ContentHeader from 'components/ContentHeader';
@@ -41,12 +45,13 @@ import {
 
 import messages from './messages';
 import { save } from './actions';
-import { DEPENDENCIES } from './constants';
+import { DEPENDENCIES, FORM_INITIAL } from './constants';
 
 export class ReportNew extends React.PureComponent { // eslint-disable-line react/prefer-stateless-function
 
   componentWillMount() {
     this.props.loadEntitiesIfNeeded();
+    this.props.initialiseForm('reportNew.form.data', FORM_INITIAL);
   }
   componentWillReceiveProps(nextProps) {
     // reload entities if invalidated
@@ -94,7 +99,7 @@ export class ReportNew extends React.PureComponent { // eslint-disable-line reac
 
   render() {
     const { dataReady, indicator, viewDomain } = this.props;
-    const { saveSending, saveError } = viewDomain.page;
+    const { saveSending, saveError, submitValid } = viewDomain.page;
     const indicatorReference = this.props.params.id;
 
     let pageTitle = this.context.intl.formatMessage(messages.pageTitle);
@@ -123,17 +128,23 @@ export class ReportNew extends React.PureComponent { // eslint-disable-line reac
               },
               {
                 type: 'save',
-                onClick: () => this.props.handleSubmit(viewDomain.form.data, indicatorReference),
+                onClick: () => this.props.handleSubmitRemote('reportNew.form.data'),
               }] : null
             }
           />
-          {saveSending &&
-            <Loading />
+          {!submitValid &&
+            <ErrorMessages
+              error={{ messages: [this.context.intl.formatMessage(appMessages.forms.multipleErrors)] }}
+              onDismiss={this.props.onErrorDismiss}
+            />
           }
           {saveError &&
-            <p>{saveError}</p>
+            <ErrorMessages
+              error={saveError}
+              onDismiss={this.props.onServerErrorDismiss}
+            />
           }
-          { !dataReady &&
+          {(saveSending || !dataReady) &&
             <Loading />
           }
           {dataReady &&
@@ -144,6 +155,7 @@ export class ReportNew extends React.PureComponent { // eslint-disable-line reac
                 formData,
                 indicatorReference
               )}
+              handleSubmitFail={this.props.handleSubmitFail}
               handleCancel={() => this.props.handleCancel(indicatorReference)}
               handleUpdate={this.props.handleUpdate}
               fields={{
@@ -166,6 +178,8 @@ export class ReportNew extends React.PureComponent { // eslint-disable-line reac
 
 ReportNew.propTypes = {
   loadEntitiesIfNeeded: PropTypes.func,
+  handleSubmitRemote: PropTypes.func.isRequired,
+  handleSubmitFail: PropTypes.func.isRequired,
   handleSubmit: PropTypes.func.isRequired,
   handleCancel: PropTypes.func.isRequired,
   handleUpdate: PropTypes.func.isRequired,
@@ -173,6 +187,9 @@ ReportNew.propTypes = {
   dataReady: PropTypes.bool,
   indicator: PropTypes.object,
   params: PropTypes.object,
+  initialiseForm: PropTypes.func,
+  onErrorDismiss: PropTypes.func.isRequired,
+  onServerErrorDismiss: PropTypes.func.isRequired,
 };
 
 ReportNew.contextTypes = {
@@ -187,8 +204,24 @@ const mapStateToProps = (state, props) => ({
 
 function mapDispatchToProps(dispatch) {
   return {
+    initialiseForm: (model, formData) => {
+      dispatch(formActions.reset(model));
+      dispatch(formActions.change(model, formData, { silent: true }));
+    },
     loadEntitiesIfNeeded: () => {
       DEPENDENCIES.forEach((path) => dispatch(loadEntitiesIfNeeded(path)));
+    },
+    onErrorDismiss: () => {
+      dispatch(submitInvalid(true));
+    },
+    onServerErrorDismiss: () => {
+      dispatch(saveErrorDismiss());
+    },
+    handleSubmitFail: () => {
+      dispatch(submitInvalid(false));
+    },
+    handleSubmitRemote: (model) => {
+      dispatch(formActions.submit(model));
     },
     handleSubmit: (formData, indicatorReference) => {
       let saveData = formData;

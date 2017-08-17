@@ -1,5 +1,7 @@
 import { truncateText } from 'utils/string';
 import { sortEntities } from 'utils/sort';
+import { ACCEPTED_STATUSES } from 'containers/App/constants';
+import { find } from 'lodash/collection';
 
 export const getIdField = (entity) => ({
   controlType: 'info',
@@ -189,7 +191,7 @@ const getConnectionField = ({
   connections,
   connectionOptions,
   entityType,
-  icon,
+  entityIcon,
   entityPath,
   appMessages,
   onEntityClick,
@@ -199,13 +201,14 @@ const getConnectionField = ({
   taxonomies,
   connections,
   entityType,
-  icon: icon || entityType,
+  entityIcon,
   entityPath: entityPath || entityType,
   onEntityClick,
   showEmpty: appMessages.entities[entityType].empty,
   connectionOptions: connectionOptions.map((option) => ({
     label: appMessages.entities[option].plural,
     path: option,
+    clientPath: option === 'measures' ? 'actions' : option,
   })),
 });
 
@@ -229,6 +232,12 @@ export const getRecommendationConnectionField = (entities, taxonomies, connectio
     entityType: 'recommendations',
     appMessages,
     onEntityClick,
+    entityIcon: (entity) => {
+      const status = find(ACCEPTED_STATUSES,
+        (option) => option.value === entity.getIn(['attributes', 'accepted'])
+      );
+      return status ? status.icon : null;
+    },
   });
 
 export const getSdgTargetConnectionField = (entities, taxonomies, connections, appMessages, onEntityClick) =>

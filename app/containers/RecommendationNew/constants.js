@@ -3,6 +3,7 @@
  * RecommendationNew constants
  *
  */
+import { fromJS } from 'immutable';
 
 export const SAVE = 'nmrf/RecommendationNew/SAVE';
 
@@ -11,4 +12,17 @@ export const DEPENDENCIES = [
   'categories',
   'taxonomies',
   'measures',
+  'measure_categories',
 ];
+
+export const FORM_INITIAL = fromJS({
+  attributes: {
+    title: '',
+    reference: '',
+    accepted: true,
+    response: '',
+    draft: true,
+  },
+  associatedTaxonomies: {},
+  associatedMeasures: [],
+});

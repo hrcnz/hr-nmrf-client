@@ -1,6 +1,6 @@
 import React from 'react';
 import PropTypes from 'prop-types';
-// import { FormattedMessage } from 'react-intl';
+import { FormattedMessage } from 'react-intl';
 import { Form } from 'react-redux-form/immutable';
 // import { Form, Errors } from 'react-redux-form/immutable';
 import CsvDownloader from 'react-csv-downloader';
@@ -8,7 +8,7 @@ import styled from 'styled-components';
 import { palette } from 'styled-theme';
 
 import { omit } from 'lodash/object';
-import { map } from 'lodash/collection';
+import { reduce } from 'lodash/collection';
 
 // import asArray from 'utils/as-array';
 // import { lowerCase } from 'utils/string';
@@ -20,22 +20,26 @@ import { map } from 'lodash/collection';
 // import Button from 'components/buttons/Button';
 // import Label from 'components/fields/Label';
 // import FieldWrap from 'components/fields/FieldWrap';
+import A from 'components/styled/A';
 import Field from 'components/fields/Field';
 
+import ErrorMessages from 'components/ErrorMessages';
 import Loading from 'components/Loading';
 
 import DocumentWrap from 'components/fields/DocumentWrap';
 
 import ButtonCancel from 'components/buttons/ButtonCancel';
+import ButtonSubmit from 'components/buttons/ButtonSubmit';
+import Clear from 'components/styled/Clear';
 
 import FileSelectControl from '../FileSelectControl';
-// import ErrorWrapper from '../ErrorWrapper';
 import FormWrapper from '../FormWrapper';
 import FormBody from '../FormBody';
 import FormFieldWrap from '../FormFieldWrap';
-// import Required from '../Required';
+import FormFooter from '../FormFooter';
+import FormFooterButtons from '../FormFooterButtons';
 
-// import messages from './messages';
+import messages from './messages';
 
 const Importing = styled.div`
   color: ${palette('primary', 0)};
@@ -51,38 +55,30 @@ const DocumentWrapEdit = styled(DocumentWrap)`
 // These props will be omitted before being passed to the Control component
 const nonControlProps = ['label', 'component', 'controlType', 'children', 'errorMessages'];
 
+const FormTitle = styled.h2`
+  padding-top:0;
+`;
+const Hint = styled.div`
+  font-size: 1.2em;
+`;
+const CsvDownload = styled.span`
+  display: inline-block;
+`;
+const DownloadTemplate = styled(A)`
+  font-weight: bold;
+`;
 
 export class ImportEntitiesForm extends React.PureComponent { // eslint-disable-line react/prefer-stateless-function
-  constructor() {
-    super();
-    this.state = {
-      succeeded: {},
-      failed: {},
-    };
-  }
 
-  componentWillReceiveProps(nextProps) {
-    if (nextProps.formData.get('import') === null || this.props.formData.get('import') === null) {
-      this.setState({
-        succeeded: {},
-        failed: {},
-      });
-    } else {
-      if (nextProps.saveSuccess) {
-        const timestamp = nextProps.saveSuccess.data.timestamp;
-        this.state.succeeded[timestamp] = this.state.succeeded[timestamp] || nextProps.saveSuccess;
-      }
-      if (nextProps.saveError) {
-        const timestamp = nextProps.saveError.data.timestamp;
-        this.state.failed[timestamp] = this.state.failed[timestamp] || nextProps.saveError;
-      }
-    }
-  }
   getControlProps = (field) => omit(field, nonControlProps);
 
+  computeProgress = ({ sending, success, errors }) =>
+    Object.keys(sending).length > 0
+      ? ((Object.keys(success).length + Object.keys(errors).length) / Object.keys(sending).length) * 100
+      : null;
+
   render() {
-    const { model, handleSubmit, handleCancel, handleReset, fieldModel, template, formData } = this.props;
-    const { failed, succeeded } = this.state;
+    const { model, handleSubmit, handleCancel, handleReset, fieldModel, template, formData, progressData } = this.props;
 
     const field = {
       id: 'file',
@@ -92,15 +88,34 @@ export class ImportEntitiesForm extends React.PureComponent { // eslint-disable-
     };
     const { id, ...props } = this.getControlProps(field);
 
-    const progress = formData.get('import')
-      ? ((Object.keys(failed).length + Object.keys(succeeded).length) / formData.get('import').rows.length) * 100
-      : null;
+    const progress = this.computeProgress(progressData);
+    const errors = progressData.errors;
 
     return (
       <div>
-        <FormWrapper>
+        <FormWrapper white>
           <Form model={model} onSubmit={handleSubmit} >
             <FormBody>
+              <FormTitle>
+                <FormattedMessage {...messages.title} />
+              </FormTitle>
+              <Hint>
+                <FormattedMessage {...messages.templateHint} />
+                <CsvDownload>
+                  <CsvDownloader
+                    datas={template.data}
+                    filename={template.filename}
+                  >
+                    <DownloadTemplate href="/" onClick={(evt) => evt.preventDefault()}>
+                      <FormattedMessage {...messages.downloadTemplate} />
+                    </DownloadTemplate>
+                  </CsvDownloader>
+                </CsvDownload>
+                <span>.</span>
+              </Hint>
+              <Hint>
+                <FormattedMessage {...messages.formatHint} />
+              </Hint>
               <Field>
                 <FormFieldWrap>
                   { (progress === null || progress === 0) &&
@@ -112,18 +127,23 @@ export class ImportEntitiesForm extends React.PureComponent { // eslint-disable-
                       {...props}
                     />
                   }
+                  {(Object.keys(errors).length > 0) &&
+                    <ErrorMessages
+                      error={{
+                        messages: reduce(errors, (memo, error) => error.messages
+                          ? memo.concat(error.messages)
+                          : memo
+                        , []),
+                      }}
+                      onDismiss={this.props.resetProgress}
+                    />
+                  }
                   { progress > 0 &&
                     <div>
                       <DocumentWrapEdit>
                         { progress < 100 &&
                           <Importing>
                             {`Importing ${formData.get('import').file.name}. `}
-                            {`Rows processed: ${Object.keys(failed).length + Object.keys(succeeded).length} of ${formData.get('import').rows.length}`}
-                            { Object.keys(failed).length > 0 &&
-                              <span>
-                                {`(${Object.keys(failed).length} errors)`}
-                              </span>
-                            }
                             <Loading
                               progress={progress}
                             />
@@ -131,40 +151,33 @@ export class ImportEntitiesForm extends React.PureComponent { // eslint-disable-
                         }
                         { progress >= 100 &&
                           <div>
-                            <p>Complete!</p>
-                            <ButtonCancel onClick={handleCancel} type="button">
-                              Done
-                            </ButtonCancel>
-                            <ButtonCancel onClick={handleReset} type="button">
-                              Import again
-                            </ButtonCancel>
+                            {(Object.keys(errors).length > 0) &&
+                              <FormattedMessage {...messages.hasErrors} />
+                            }
+                            {(Object.keys(errors).length === 0) &&
+                              <FormattedMessage {...messages.success} />
+                            }
                           </div>
                         }
                       </DocumentWrapEdit>
-                      { Object.keys(failed).length > 0 &&
-                        <div>
-                          <p>Failed rows:</p>
-                          { map(failed, (error, i) => (
-                            <p key={i}>
-                              {JSON.stringify(error.data.entity.attributes)}
-                            </p>
-                          ))}
-                        </div>
-                      }
                     </div>
                   }
                 </FormFieldWrap>
               </Field>
-              <div>
-                Not sure about the format?
-                <CsvDownloader
-                  type="button"
-                  text="Download template"
-                  datas={template.data}
-                  filename={template.filename}
-                />
-              </div>
             </FormBody>
+            { progress >= 100 &&
+              <FormFooter>
+                <FormFooterButtons>
+                  <ButtonCancel type="button" onClick={handleReset}>
+                    <FormattedMessage {...messages.importAgain} />
+                  </ButtonCancel>
+                  <ButtonSubmit type="button" onClick={handleCancel}>
+                    <FormattedMessage {...messages.done} />
+                  </ButtonSubmit>
+                </FormFooterButtons>
+                <Clear />
+              </FormFooter>
+            }
           </Form>
         </FormWrapper>
       </div>
@@ -175,18 +188,12 @@ export class ImportEntitiesForm extends React.PureComponent { // eslint-disable-
 ImportEntitiesForm.propTypes = {
   handleSubmit: PropTypes.func.isRequired,
   handleReset: PropTypes.func.isRequired,
+  resetProgress: PropTypes.func.isRequired,
   handleCancel: PropTypes.func.isRequired,
   model: PropTypes.string,
   fieldModel: PropTypes.string,
   formData: PropTypes.object,
-  // saveSuccess: PropTypes.oneOfType([
-  //   PropTypes.bool,
-  //   PropTypes.object,
-  // ]),
-  // saveError: PropTypes.oneOfType([
-  //   PropTypes.bool,
-  //   PropTypes.object,
-  // ]),
+  progressData: PropTypes.object,
   template: PropTypes.object,
 };
 

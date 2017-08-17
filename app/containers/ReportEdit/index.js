@@ -35,10 +35,13 @@ import {
   updatePath,
   updateEntityForm,
   deleteEntity,
+  submitInvalid,
+  saveErrorDismiss,
 } from 'containers/App/actions';
 
 import { selectReady, selectIsUserAdmin } from 'containers/App/selectors';
 
+import ErrorMessages from 'components/ErrorMessages';
 import Loading from 'components/Loading';
 import Content from 'components/Content';
 import ContentHeader from 'components/ContentHeader';
@@ -59,7 +62,7 @@ export class ReportEdit extends React.PureComponent { // eslint-disable-line rea
     this.props.loadEntitiesIfNeeded();
 
     if (this.props.dataReady && this.props.viewEntity) {
-      this.props.populateForm('reportEdit.form.data', this.getInitialFormData());
+      this.props.initialiseForm('reportEdit.form.data', this.getInitialFormData());
     }
   }
 
@@ -71,7 +74,7 @@ export class ReportEdit extends React.PureComponent { // eslint-disable-line rea
 
     if (nextProps.dataReady && !this.props.dataReady && nextProps.viewEntity) {
       this.props.redirectIfNotPermitted();
-      this.props.populateForm('reportEdit.form.data', this.getInitialFormData(nextProps));
+      this.props.initialiseForm('reportEdit.form.data', this.getInitialFormData(nextProps));
     }
   }
 
@@ -139,7 +142,7 @@ export class ReportEdit extends React.PureComponent { // eslint-disable-line rea
   render() {
     const { viewEntity, dataReady, viewDomain } = this.props;
     const reference = this.props.params.id;
-    const { saveSending, saveError, deleteSending, deleteError } = viewDomain.page;
+    const { saveSending, saveError, deleteSending, deleteError, submitValid } = viewDomain.page;
 
     let pageTitle = this.context.intl.formatMessage(messages.pageTitle);
     if (viewEntity && dataReady) {
@@ -165,18 +168,27 @@ export class ReportEdit extends React.PureComponent { // eslint-disable-line rea
               },
               {
                 type: 'save',
-                onClick: () => this.props.handleSubmit(viewDomain.form.data, viewEntity.getIn(['attributes', 'due_date_id'])),
+                onClick: () => this.props.handleSubmitRemote('reportEdit.form.data'),
               }] : null
             }
           />
-          {(saveSending || deleteSending || !dataReady) &&
-            <Loading />
-          }
-          {deleteError &&
-            <p>{deleteError}</p>
+          {!submitValid &&
+            <ErrorMessages
+              error={{ messages: [this.context.intl.formatMessage(appMessages.forms.multipleErrors)] }}
+              onDismiss={this.props.onErrorDismiss}
+            />
           }
           {saveError &&
-            <p>{saveError}</p>
+            <ErrorMessages
+              error={saveError}
+              onDismiss={this.props.onServerErrorDismiss}
+            />
+          }
+          {deleteError &&
+            <ErrorMessages error={deleteError} />
+          }
+          {(saveSending || deleteSending || !dataReady) &&
+            <Loading />
           }
           {!viewEntity && dataReady && !saveError && !deleteSending &&
             <div>
@@ -188,6 +200,7 @@ export class ReportEdit extends React.PureComponent { // eslint-disable-line rea
               model="reportEdit.form.data"
               formData={viewDomain.form.data}
               handleSubmit={(formData) => this.props.handleSubmit(formData, viewEntity.getIn(['attributes', 'due_date_id']))}
+              handleSubmitFail={this.props.handleSubmitFail}
               handleCancel={() => this.props.handleCancel(reference)}
               handleUpdate={this.props.handleUpdate}
               handleDelete={() => this.props.isUserAdmin
@@ -215,7 +228,9 @@ export class ReportEdit extends React.PureComponent { // eslint-disable-line rea
 ReportEdit.propTypes = {
   loadEntitiesIfNeeded: PropTypes.func,
   redirectIfNotPermitted: PropTypes.func,
-  populateForm: PropTypes.func,
+  initialiseForm: PropTypes.func,
+  handleSubmitRemote: PropTypes.func.isRequired,
+  handleSubmitFail: PropTypes.func.isRequired,
   handleSubmit: PropTypes.func.isRequired,
   handleCancel: PropTypes.func.isRequired,
   handleUpdate: PropTypes.func.isRequired,
@@ -225,6 +240,8 @@ ReportEdit.propTypes = {
   dataReady: PropTypes.bool,
   isUserAdmin: PropTypes.bool,
   params: PropTypes.object,
+  onErrorDismiss: PropTypes.func.isRequired,
+  onServerErrorDismiss: PropTypes.func.isRequired,
 };
 
 ReportEdit.contextTypes = {
@@ -249,8 +266,20 @@ function mapDispatchToProps(dispatch, props) {
     redirectIfNotPermitted: () => {
       dispatch(redirectIfNotPermitted(USER_ROLES.CONTRIBUTOR));
     },
-    populateForm: (model, formData) => {
+    initialiseForm: (model, formData) => {
       dispatch(formActions.load(model, formData));
+    },
+    onErrorDismiss: () => {
+      dispatch(submitInvalid(true));
+    },
+    onServerErrorDismiss: () => {
+      dispatch(saveErrorDismiss());
+    },
+    handleSubmitFail: () => {
+      dispatch(submitInvalid(false));
+    },
+    handleSubmitRemote: (model) => {
+      dispatch(formActions.submit(model));
     },
     handleSubmit: (formData, previousDateAssigned) => {
       let saveData = formData;

@@ -11,7 +11,7 @@ import Helmet from 'react-helmet';
 import { FormattedMessage } from 'react-intl';
 import { actions as formActions } from 'react-redux-form/immutable';
 
-import { Map, List, fromJS } from 'immutable';
+import { Map, List } from 'immutable';
 
 import {
   userOptions,
@@ -38,6 +38,8 @@ import {
   updatePath,
   updateEntityForm,
   deleteEntity,
+  submitInvalid,
+  saveErrorDismiss,
 } from 'containers/App/actions';
 
 import {
@@ -45,6 +47,7 @@ import {
   selectIsUserAdmin,
 } from 'containers/App/selectors';
 
+import ErrorMessages from 'components/ErrorMessages';
 import Loading from 'components/Loading';
 import Content from 'components/Content';
 import ContentHeader from 'components/ContentHeader';
@@ -66,7 +69,7 @@ export class CategoryEdit extends React.PureComponent { // eslint-disable-line r
     this.props.loadEntitiesIfNeeded();
 
     if (this.props.dataReady && this.props.viewEntity) {
-      this.props.populateForm('categoryEdit.form.data', this.getInitialFormData());
+      this.props.initialiseForm('categoryEdit.form.data', this.getInitialFormData());
     }
   }
 
@@ -77,7 +80,7 @@ export class CategoryEdit extends React.PureComponent { // eslint-disable-line r
     }
     if (nextProps.dataReady && !this.props.dataReady && nextProps.viewEntity) {
       this.props.redirectIfNotPermitted();
-      this.props.populateForm('categoryEdit.form.data', this.getInitialFormData(nextProps));
+      this.props.initialiseForm('categoryEdit.form.data', this.getInitialFormData(nextProps));
     }
   }
 
@@ -136,7 +139,7 @@ export class CategoryEdit extends React.PureComponent { // eslint-disable-line r
   render() {
     const { viewEntity, dataReady, isAdmin, viewDomain, users } = this.props;
     const reference = this.props.params.id;
-    const { saveSending, saveError, deleteSending, deleteError } = viewDomain.page;
+    const { saveSending, saveError, deleteSending, deleteError, submitValid } = viewDomain.page;
 
     return (
       <div>
@@ -158,18 +161,27 @@ export class CategoryEdit extends React.PureComponent { // eslint-disable-line r
               },
               {
                 type: 'save',
-                onClick: () => this.props.handleSubmit(viewDomain.form.data),
+                onClick: () => this.props.handleSubmitRemote('categoryEdit.form.data'),
               }] : null
             }
           />
-          {(saveSending || deleteSending || !dataReady) &&
-            <Loading />
-          }
-          {deleteError &&
-            <p>{deleteError}</p>
+          {!submitValid &&
+            <ErrorMessages
+              error={{ messages: [this.context.intl.formatMessage(appMessages.forms.multipleErrors)] }}
+              onDismiss={this.props.onErrorDismiss}
+            />
           }
           {saveError &&
-            <p>{saveError}</p>
+            <ErrorMessages
+              error={saveError}
+              onDismiss={this.props.onServerErrorDismiss}
+            />
+          }
+          {deleteError &&
+            <ErrorMessages error={deleteError} />
+          }
+          {(saveSending || deleteSending || !dataReady) &&
+            <Loading />
           }
           {!viewEntity && dataReady && !saveError && !deleteSending &&
             <div>
@@ -181,6 +193,7 @@ export class CategoryEdit extends React.PureComponent { // eslint-disable-line r
               model="categoryEdit.form.data"
               formData={viewDomain.form.data}
               handleSubmit={(formData) => this.props.handleSubmit(formData)}
+              handleSubmitFail={this.props.handleSubmitFail}
               handleCancel={() => this.props.handleCancel(reference)}
               handleUpdate={this.props.handleUpdate}
               handleDelete={() => isAdmin
@@ -208,7 +221,9 @@ export class CategoryEdit extends React.PureComponent { // eslint-disable-line r
 CategoryEdit.propTypes = {
   loadEntitiesIfNeeded: PropTypes.func,
   redirectIfNotPermitted: PropTypes.func,
-  populateForm: PropTypes.func,
+  initialiseForm: PropTypes.func,
+  handleSubmitRemote: PropTypes.func.isRequired,
+  handleSubmitFail: PropTypes.func.isRequired,
   handleSubmit: PropTypes.func.isRequired,
   handleCancel: PropTypes.func.isRequired,
   handleUpdate: PropTypes.func.isRequired,
@@ -219,6 +234,8 @@ CategoryEdit.propTypes = {
   isAdmin: PropTypes.bool,
   params: PropTypes.object,
   users: PropTypes.object,
+  onErrorDismiss: PropTypes.func.isRequired,
+  onServerErrorDismiss: PropTypes.func.isRequired,
 };
 
 CategoryEdit.contextTypes = {
@@ -241,8 +258,21 @@ function mapDispatchToProps(dispatch, props) {
     redirectIfNotPermitted: () => {
       dispatch(redirectIfNotPermitted(USER_ROLES.MANAGER));
     },
-    populateForm: (model, formData) => {
-      dispatch(formActions.load(model, fromJS(formData)));
+    initialiseForm: (model, formData) => {
+      dispatch(formActions.reset(model));
+      dispatch(formActions.change(model, formData, { silent: true }));
+    },
+    onErrorDismiss: () => {
+      dispatch(submitInvalid(true));
+    },
+    onServerErrorDismiss: () => {
+      dispatch(saveErrorDismiss());
+    },
+    handleSubmitFail: () => {
+      dispatch(submitInvalid(false));
+    },
+    handleSubmitRemote: (model) => {
+      dispatch(formActions.submit(model));
     },
     handleSubmit: (formData) => {
       let saveData = formData;

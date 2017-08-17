@@ -1,5 +1,4 @@
 import { fromJS } from 'immutable';
-
 import { LOCATION_CHANGE } from 'react-router-redux';
 
 import {
@@ -9,7 +8,11 @@ import {
   DELETE_SENDING,
   DELETE_ERROR,
   DELETE_SUCCESS,
+  SUBMIT_INVALID,
+  SAVE_ERROR_DISMISS,
 } from 'containers/App/constants';
+
+import { checkResponseError } from 'utils/request';
 
 const initialState = fromJS({
   saveSending: false,
@@ -18,10 +21,13 @@ const initialState = fromJS({
   deleteSending: false,
   deleteSuccess: false,
   deleteError: false,
+  submitValid: true,
 });
 
 export const entityFormReducer = (state = initialState, action) => {
   switch (action.type) {
+    case LOCATION_CHANGE:
+      return initialState;
     case SAVE_SENDING:
       return state
         .set('saveSending', true)
@@ -35,7 +41,12 @@ export const entityFormReducer = (state = initialState, action) => {
       return state
         .set('saveSending', false)
         .set('saveSuccess', false)
-        .set('saveError', action.error);
+        .set('saveError', checkResponseError(action.error));
+    case SAVE_ERROR_DISMISS:
+      return state
+        .set('saveSending', false)
+        .set('saveSuccess', false)
+        .set('saveError', false);
     case DELETE_SENDING:
       return state
         .set('deleteSending', true)
@@ -49,25 +60,9 @@ export const entityFormReducer = (state = initialState, action) => {
       return state
         .set('deleteSending', false)
         .set('deleteSuccess', false)
-        .set('deleteError', action.error);
-    default:
-      return state;
-  }
-};
-
-export const entityImportReducer = (state = initialState, action) => {
-  switch (action.type) {
-    case LOCATION_CHANGE:
-      return initialState;
-    case SAVE_SENDING:
-      return state
-        .set('saveSending', action);
-    case SAVE_SUCCESS:
-      return state
-        .set('saveSuccess', action);
-    case SAVE_ERROR:
-      return state
-        .set('saveError', action);
+        .set('deleteError', checkResponseError(action.error));
+    case SUBMIT_INVALID:
+      return state.set('submitValid', action.valid);
     default:
       return state;
   }
