@@ -80,7 +80,7 @@ export const TAXONOMY_GROUPS = [
 // General ********************
 
 export const ENDPOINTS = {
-  API: 'https://nmrf-nz-staging.herokuapp.com', // server API endpoint
+  API: 'https://npa-production.herokuapp.com', // server API endpoint
   SIGNING_URL: '/s3/sign', // server AWS S3 signing url endpoint
   SIGN_IN: 'auth/sign_in',
   SIGN_OUT: 'auth/sign_out',
