@@ -45,6 +45,15 @@ export const sortOptions = (options) => options
     (option) => getOptionSortCheckedValueMapper(option),
     (a, b) => getEntitySortComparator(a, b, 'asc')
   );
+export const sortGroups = (groups) => groups
+  .sortBy(
+    (group) => getOptionSortValueMapper(group),
+    (a, b) => getEntitySortComparator(a, b, 'asc')
+  )
+  .sortBy(
+    (group) => group.get('special') ? -1 : 1,
+    (a, b) => getEntitySortComparator(a, b, 'asc')
+  );
 
 export const prepareOptionSearchTarget = (option, fields, queryLength) =>
   reduce(

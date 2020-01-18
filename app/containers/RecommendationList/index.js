@@ -13,10 +13,7 @@ import { Map, List, fromJS } from 'immutable';
 
 import { loadEntitiesIfNeeded, updatePath } from 'containers/App/actions';
 import { ACCEPTED_STATUSES } from 'themes/config';
-import {
-  selectReady,
-  selectRecommendationTaxonomies,
-} from 'containers/App/selectors';
+import { selectReady } from 'containers/App/selectors';
 
 import appMessages from 'containers/App/messages';
 import { PATHS } from 'containers/App/constants';
@@ -24,7 +21,7 @@ import { PATHS } from 'containers/App/constants';
 import EntityList from 'containers/EntityList';
 
 import { CONFIG, DEPENDENCIES } from './constants';
-import { selectRecommendations, selectConnectedTaxonomies, selectConnections } from './selectors';
+import { selectRecommendations, selectConnectedTaxonomies, selectConnections, selectRecommendationTaxonomies } from './selectors';
 import messages from './messages';
 
 export class RecommendationList extends React.PureComponent { // eslint-disable-line react/prefer-stateless-function

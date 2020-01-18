@@ -11,6 +11,7 @@ import appMessages from 'containers/App/messages';
 import {
   getConnectedCategories,
   testEntityCategoryAssociation,
+  testEntitySpecialCategoryAssociation,
   getEntityTitle,
   getEntityReference,
   getEntityParentId,
@@ -149,13 +150,19 @@ export const makeTaxonomyFilterOptions = (entities, config, taxonomies, activeTa
     selectAll: false,
     groups: null,
   };
+
   // get the active taxonomy
   const taxonomy = taxonomies.get(activeTaxId);
   if (taxonomy && taxonomy.get('categories')) {
     const parentId = getEntityParentId(taxonomy);
     const parent = parentId && taxonomies.get(parentId);
+    let checkSpecial = false;
     if (parent) {
-      filterOptions.groups = parent.get('categories').map((cat) => getEntityTitle(cat));
+      checkSpecial = config.specialOptions && config.specialOptions[parseInt(activeTaxId, 10)];
+      filterOptions.groups = parent.get('categories').map((cat) => ({
+        label: getEntityTitle(cat),
+        reference: getEntityReference(cat, false),
+      }));
     }
     filterOptions.title = `${messages.titlePrefix} ${lowerCase(getTaxTitle(parseInt(taxonomy.get('id'), 10), contextIntl))}`;
     if (entities.size === 0) {
@@ -226,6 +233,33 @@ export const makeTaxonomyFilterOptions = (entities, config, taxonomies, activeTa
               }
             }
           });
+
+          // special options
+          if (checkSpecial) {
+            const special = config.specialOptions[parseInt(activeTaxId, 10)];
+            const isEntitySpecial = testEntitySpecialCategoryAssociation(
+              entity,
+              taxonomy.get('categories'),
+              special.attribute,
+            );
+            if (isEntitySpecial) {
+              if (filterOptions.options[special.attribute]) {
+                filterOptions.options[special.attribute].count += 1;
+              } else {
+                const value = `${activeTaxId}:${special.attribute}`;
+                filterOptions.options[special.attribute] = {
+                  label: special.label,
+                  showCount: true,
+                  value,
+                  count: 1,
+                  query: 'cat-special',
+                  checked: optionChecked(locationQuery.get('cat-special'), value),
+                  special: true,
+                  group: 'special',
+                };
+              }
+            }
+          }
         }
         if (taxCategoryIds.length === 0) {
           if (filterOptions.options.without) {

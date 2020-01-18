@@ -7,10 +7,12 @@ import {
   selectWithoutQuery,
   selectConnectionQuery,
   selectCategoryQuery,
+  selectSpecialCategoryQuery,
   selectSortByQuery,
   selectSortOrderQuery,
   selectRecommendationConnections,
   selectTaxonomiesSorted,
+  selectRecommendationTaxonomies as selectRecTaxonomies,
 } from 'containers/App/selectors';
 
 import {
@@ -21,11 +23,71 @@ import {
   entitiesSetCategoryIds,
   getEntityCategories,
   getEntityConnections,
+  attributesEqual,
+  testEntitySpecialCategoryAssociation,
 } from 'utils/entities';
 
 import { sortEntities, getSortOption } from 'utils/sort';
 
 import { CONFIG } from './constants';
+
+
+export const selectRecommendationTaxonomies = createSelector(
+  selectRecTaxonomies,
+  (taxonomies) =>
+    taxonomies.map((tax) => {
+      if (CONFIG.taxonomies.specialOptions) {
+        const special = CONFIG.taxonomies.specialOptions[parseInt(tax.get('id'), 10)];
+        if (special && special.attribute === 'most_recent') {
+          if (tax.getIn(['attributes', 'parent_id'])) {
+            const parent = taxonomies.get(tax.getIn(['attributes', 'parent_id']).toString());
+            if (parent) {
+              return tax.set('categories', tax.get('categories').map((cat) => {
+                const parentCat = parent.get('categories').find((c) =>
+                  attributesEqual(c.get('id'), cat.getIn(['attributes', 'parent_id']))
+                );
+                const siblings = parentCat && tax.get('categories').filter((c) =>
+                  attributesEqual(parentCat.get('id'), c.getIn(['attributes', 'parent_id']))
+                );
+                if (siblings) {
+                  if (siblings.size === 1) {
+                    return cat.set(special.attribute, true);
+                  }
+                  const sortedSiblings = siblings.sortBy(
+                    (c) => c.getIn(['attributes', 'date']),
+                    (a, b) => {
+                      const aIsDate = new Date(a) instanceof Date && !isNaN(new Date(a));
+                      const bIsDate = new Date(b) instanceof Date && !isNaN(new Date(b));
+                      if (aIsDate && !bIsDate) {
+                        return -1;
+                      } else if (!aIsDate && bIsDate) {
+                        return 1;
+                      } else if (aIsDate && bIsDate) {
+                        return new Date(a) < new Date(b) ? 1 : -1;
+                      }
+                      return 0;
+                    }
+                  );
+                  return cat.set(
+                    special.attribute,
+                    attributesEqual(
+                      sortedSiblings.first().get('id'),
+                      cat.get('id'),
+                    ),
+                  );
+                }
+                return cat;
+              }));
+            }
+            return tax;
+          }
+          return tax;
+        }
+        return tax;
+      }
+      return tax;
+    })
+);
 
 const selectRecommendationsNested = createSelector(
   (state, locationQuery) => selectEntitiesSearchQuery(state, {
@@ -71,6 +133,28 @@ const selectRecommendationsByCategories = createSelector(
     ? filterEntitiesByCategories(entities, query)
     : entities
 );
+const selectRecommendationsBySpecialCategories = createSelector(
+  selectRecommendationsByCategories,
+  selectRecommendationTaxonomies,
+  selectSpecialCategoryQuery,
+  (entities, taxonomies, query) => {
+    if (query && query.indexOf(':') > -1) {
+      const taxId = query.split(':')[0];
+      const specialQuery = query.split(':')[1];
+      if (specialQuery === 'most_recent') {
+        const taxonomy = taxonomies.get(taxId);
+        return entities.filter((entity) =>
+          testEntitySpecialCategoryAssociation(
+            entity,
+            taxonomy.get('categories'),
+            'most_recent',
+          )
+        );
+      }
+      return entities;
+    }
+    return entities;
+  });
 // kicks off series of cascading selectors
 // 1. selectEntitiesWhere filters by attribute
 // 2. selectEntitiesSearchQuery filters by keyword
@@ -79,7 +163,7 @@ const selectRecommendationsByCategories = createSelector(
 // 5. selectRecommendationsByConnections will filter by specific connection
 // 6. selectRecommendationsByCategories will filter by specific categories
 export const selectRecommendations = createSelector(
-  selectRecommendationsByCategories,
+  selectRecommendationsBySpecialCategories,
   selectSortByQuery,
   selectSortOrderQuery,
   (entities, sort, order) => {

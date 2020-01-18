@@ -11,6 +11,8 @@ import IndeterminateCheckbox from 'components/forms/IndeterminateCheckbox';
 
 import Option from './Option';
 
+import { sortGroups } from './utils';
+
 import messages from './messages';
 
 const Styled = styled.div`
@@ -142,29 +144,36 @@ class OptionList extends React.PureComponent {
   }
 
   render() {
-    // do groups not slice
+    // groups do not slice
     const options = this.props.groups
       ? this.props.options
       : (this.props.options && this.props.options.slice(0, this.state.show));
     const groups = options && options
-      .groupBy((option) => option.get('group') || 1)
-      .map((group, key) => this.props.groups
-        ? Map()
-          .set('options', group)
-          .set('title', this.props.groups.get(key))
-        : Map().set('options', group)
-      );
+      .groupBy((option) => option.get('group') || -1)
+      .map((optionsGroup, key) => {
+        // console.log(this.props.groups && this.props.groups.get(key))
+        const result = Map().set('options', optionsGroup);
+        const group = this.props.groups && this.props.groups.get(key);
+        if (group) {
+          return result
+            .set('label', group.label)
+            .set('reference', group.reference);
+        }
+        if (key === 'special') {
+          return result.set('special', true);
+        }
+        return result;
+      });
 
     const hasMore = options.size < this.props.options.size;
-
     return (
       <Styled>
         <ListWrapper>
-          { groups && groups.toList().map((group, gid) => (
+          { groups && sortGroups(groups).toList().map((group, gid) => (
             <GroupWrapper key={gid}>
-              { group.get('title') && (
+              { group.get('label') && (
                 <GroupTitle>
-                  { group.get('title') }
+                  { group.get('label') }
                 </GroupTitle>
               )}
               <OptionsWrapper>

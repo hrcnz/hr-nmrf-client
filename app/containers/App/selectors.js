@@ -248,6 +248,10 @@ export const selectCategoryQuery = createSelector(
   (state, locationQuery) => locationQuery,
   (locationQuery) => locationQuery && locationQuery.get('cat')
 );
+export const selectSpecialCategoryQuery = createSelector(
+  (state, locationQuery) => locationQuery,
+  (locationQuery) => locationQuery && locationQuery.get('cat-special')
+);
 
 export const selectConnectionQuery = createSelector(
   (state, locationQuery) => locationQuery,

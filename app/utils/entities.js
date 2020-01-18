@@ -18,6 +18,15 @@ export const testEntityCategoryAssociation = (entity, categoryId) =>
 export const testEntityParentCategoryAssociation = (entity, categories, categoryId) =>
   testEntityEntityAssociation(entity, 'categories', categoryId);
 
+export const testEntitySpecialCategoryAssociation = (entity, categories, specialAttribute) =>
+  categories.some((cat) =>
+    cat.get(specialAttribute) &&
+    entity.get('categories').find((catId) => attributesEqual(catId, cat.get('id')))
+  );
+  // entity.get('categories').some((catId) => {
+  //   const category = categories.get(catId.toString());
+  //   return category && category.get(specialAttribute);
+  // });
 // check if entity has any category by taxonomy id
 export const testEntityTaxonomyAssociation = (entity, categories, taxonomyId) =>
   entity
@@ -60,50 +69,45 @@ export const getConnectedCategories = (entityConnectedIds, taxonomyCategories, p
 // assumes prior nesting of relationships
 export const filterEntitiesWithoutAssociation = (entities, categories, query) =>
   entities && entities.filter((entity) =>
-    asList(query).reduce((passing, pathOrTax) =>
-      passing && !(isNumber(pathOrTax)
+    asList(query).some((pathOrTax) =>
+      !(isNumber(pathOrTax)
         ? testEntityTaxonomyAssociation(entity, categories, parseInt(pathOrTax, 10))
         : testEntityAssociation(entity, pathOrTax)
       )
-    , true)
+    )
   );
 
 // filter entities by association with one or more categories
 // assumes prior nesting of relationships
 export const filterEntitiesByCategories = (entities, query) =>
   entities && entities.filter((entity) =>
-    asList(query).reduce((passing, categoryId) =>
-      passing && testEntityCategoryAssociation(entity, parseInt(categoryId, 10))
-    , true)
+    asList(query).some((categoryId) =>
+      testEntityCategoryAssociation(entity, parseInt(categoryId, 10)))
   );
 
 // filter entities by association with one or more categories
 // assumes prior nesting of relationships
 export const filterEntitiesByConnectedCategories = (entities, connections, query) =>
   entities && entities.filter((entity) =>
-    asList(query).reduce((passing, queryArg) => {
+    asList(query).some((queryArg) => {
       const pathValue = queryArg.split(':');
       const path = pathValue[0];
       const connectionsForPath = connections.get(path);
-      return connectionsForPath
-        ? passing && connectionsForPath.some((connection) =>
-            testEntityEntityAssociation(entity, path, connection.get('id'))
-            && testEntityCategoryAssociation(connection, pathValue[1])
-          )
-        : passing;
-    }, true)
+      return connectionsForPath && connectionsForPath.some((connection) =>
+        testEntityEntityAssociation(entity, path, connection.get('id'))
+        && testEntityCategoryAssociation(connection, pathValue[1])
+      );
+    })
   );
 
 // filter entities by by association with one or more entities of specific connection type
 // assumes prior nesting of relationships
 export const filterEntitiesByConnection = (entities, query) =>
   entities && entities.filter((entity) =>
-    asList(query).reduce((passing, queryArg) => {
+    asList(query).some((queryArg) => {
       const pathValue = queryArg.split(':');
       const path = pathValue[0];
-      return entity.get(path)
-        ? passing && testEntityEntityAssociation(entity, path, pathValue[1])
-        : passing;
+      return entity.get(path) && testEntityEntityAssociation(entity, path, pathValue[1]);
     }, true)
   );
 

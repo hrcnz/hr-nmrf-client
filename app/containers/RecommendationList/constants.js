@@ -1,4 +1,4 @@
-import { USER_ROLES, PUBLISH_STATUSES, ACCEPTED_STATUSES } from 'themes/config';
+import { USER_ROLES, PUBLISH_STATUSES, ACCEPTED_STATUSES, CYCLE_TAXONOMY_ID } from 'themes/config';
 
 export const DEPENDENCIES = [
   'user_roles',
@@ -39,13 +39,21 @@ export const CONFIG = {
       order: 'desc',
     },
   ],
-  taxonomies: { // filter by each category
+  taxonomies: { // filters by each category
     query: 'cat',
+    querySpecial: 'cat-special',
     search: true,
     connectPath: 'recommendation_categories',
     key: 'category_id',
     ownKey: 'recommendation_id',
     defaultGroupAttribute: 'groups_recommendations_default',
+    specialOptions: {
+      [CYCLE_TAXONOMY_ID]: {
+        label: 'Most recent cycles',
+        attribute: 'most_recent',
+        type: 'boolean',
+      },
+    },
   },
   connections: { // filter by associated entity
     query: 'connected',

@@ -245,7 +245,7 @@ class MultiSelect extends React.Component {
 
   // props, state
   // map options
-  prepareOptions = ({ options, values, threeState }, { optionsInitial }) => options.map((option) => {
+  prepareOptions = ({ options, values, threeState, specialOptions }, { optionsInitial }) => options.map((option) => {
     const value = values.find((v) => option.get('value') === v.get('value'));// && option.get('query') === v.get('query'));
     const isNew = !optionsInitial.includes(option);
     const isIndeterminateInitial = threeState && this.isOptionIndeterminate(option);

@@ -15,6 +15,9 @@ export const currentFilterArgs = (config, locationQuery) => {
   if (config.taxonomies && locationQuery.get(config.taxonomies.query)) {
     args = args.concat(config.taxonomies.query);
   }
+  if (config.taxonomies && config.taxonomies.specialOptions && locationQuery.get('cat-special')) {
+    args = args.concat('cat-special');
+  }
   if (config.connectedTaxonomies && locationQuery.get(config.connectedTaxonomies.query)) {
     args = args.concat(config.connectedTaxonomies.query);
   }
@@ -111,6 +114,26 @@ const getCurrentTaxonomyFilters = (
   withoutLabel
 ) => {
   const tags = [];
+  if (taxonomyFilters.specialOptions && locationQuery.get(taxonomyFilters.querySpecial)) {
+    const locationQueryValue = locationQuery.get(taxonomyFilters.querySpecial);
+    if (locationQueryValue.indexOf(':') > -1) {
+      const taxId = locationQueryValue.split(':')[0];
+      const specialQuery = locationQueryValue.split(':')[1];
+      const option = taxonomyFilters.specialOptions[taxId];
+      if (option && specialQuery === 'most_recent' && option.attribute === 'most_recent') {
+        tags.push({
+          label: option.label,
+          type: 'taxonomies',
+          id: taxId,
+          onClick: () => onClick({
+            value: locationQueryValue,
+            query: taxonomyFilters.querySpecial,
+            checked: false,
+          }),
+        });
+      }
+    }
+  }
   if (locationQuery.get(taxonomyFilters.query)) {
     const locationQueryValue = locationQuery.get(taxonomyFilters.query);
     taxonomies.forEach((taxonomy) => {
