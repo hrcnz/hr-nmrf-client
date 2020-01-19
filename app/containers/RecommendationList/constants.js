@@ -51,7 +51,7 @@ export const CONFIG = {
       [CYCLE_TAXONOMY_ID]: {
         label: 'Most recent cycles',
         attribute: 'most_recent',
-        type: 'boolean',
+        default: true,
       },
     },
   },

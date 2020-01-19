@@ -253,8 +253,10 @@ export const makeTaxonomyFilterOptions = (entities, config, taxonomies, activeTa
                   value,
                   count: 1,
                   query: 'cat-special',
-                  checked: optionChecked(locationQuery.get('cat-special'), value),
+                  checked: optionChecked(locationQuery.get('cat-special'), value) ||
+                    (special.default && !locationQuery.get('cat-special')),
                   special: true,
+                  defaultValue: special.default && '0',
                   group: 'special',
                 };
               }

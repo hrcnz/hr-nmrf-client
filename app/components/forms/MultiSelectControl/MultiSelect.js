@@ -189,6 +189,9 @@ class MultiSelect extends React.Component {
       }
     }
 
+    // set new value
+    let newValue = option.set('checked', checked).set('hasChanged', true);
+
     // uncheck all others if single mode (!multiple)
     let nextValues = values;
     const existingValueIndex = values.findIndex((v) =>
@@ -201,8 +204,13 @@ class MultiSelect extends React.Component {
         existingValueIndex !== index ? value.set('checked', false).set('hasChanged', true) : value
       );
     }
-    // set new value
-    const newValue = option.set('checked', checked).set('hasChanged', true);
+    if (checked && newValue.get('special')) {
+      newValue = newValue.set('replace', true);
+    }
+    if (!checked && newValue.get('special') && newValue.get('defaultValue')) {
+      newValue = newValue.set('checked', true);
+      newValue = newValue.set('value', newValue.get('defaultValue'));
+    }
     // set current value, add if not present
     return existingValueIndex > -1 ? nextValues.set(existingValueIndex, newValue) : nextValues.push(newValue);
   }

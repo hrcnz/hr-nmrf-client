@@ -1,4 +1,4 @@
-import { find, forEach } from 'lodash/collection';
+import { find, forEach, reduce } from 'lodash/collection';
 import { upperFirst } from 'lodash/string';
 
 import { TEXT_TRUNCATE } from 'themes/config';
@@ -15,8 +15,20 @@ export const currentFilterArgs = (config, locationQuery) => {
   if (config.taxonomies && locationQuery.get(config.taxonomies.query)) {
     args = args.concat(config.taxonomies.query);
   }
-  if (config.taxonomies && config.taxonomies.specialOptions && locationQuery.get('cat-special')) {
-    args = args.concat('cat-special');
+  if (config.taxonomies && config.taxonomies.specialOptions) {
+    const query = locationQuery.get('cat-special');
+    if (query) {
+      args = args.concat('cat-special');
+    }
+    if (reduce(config.taxonomies.specialOptions, (memo, option, taxId) => {
+      const qTaxId = query && query.indexOf(':') > -1 && query.split(':')[0];
+      if (option.default && attributesEqual(taxId, qTaxId)) {
+        return true;
+      }
+      return memo;
+    }, false)) {
+      args = args.concat('cat-special');
+    }
   }
   if (config.connectedTaxonomies && locationQuery.get(config.connectedTaxonomies.query)) {
     args = args.concat(config.connectedTaxonomies.query);
@@ -120,19 +132,36 @@ const getCurrentTaxonomyFilters = (
       const taxId = locationQueryValue.split(':')[0];
       const specialQuery = locationQueryValue.split(':')[1];
       const option = taxonomyFilters.specialOptions[taxId];
-      if (option && specialQuery === 'most_recent' && option.attribute === 'most_recent') {
+      if (option && specialQuery === option.attribute) {
         tags.push({
           label: option.label,
           type: 'taxonomies',
           id: taxId,
           onClick: () => onClick({
-            value: locationQueryValue,
+            value: option.default ? '0' : locationQueryValue,
             query: taxonomyFilters.querySpecial,
-            checked: false,
+            checked: true,
+            replace: option.default || false,
           }),
         });
       }
     }
+  }
+  if (taxonomyFilters.specialOptions && !locationQuery.get(taxonomyFilters.querySpecial)) {
+    forEach(taxonomyFilters.specialOptions, (option, taxId) => {
+      if (option.default) {
+        tags.push({
+          label: option.label,
+          type: 'taxonomies',
+          id: taxId,
+          onClick: () => onClick({
+            value: '0',
+            query: taxonomyFilters.querySpecial,
+            checked: true,
+          }),
+        });
+      }
+    });
   }
   if (locationQuery.get(taxonomyFilters.query)) {
     const locationQueryValue = locationQuery.get(taxonomyFilters.query);

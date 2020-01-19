@@ -1,5 +1,6 @@
 import { createSelector } from 'reselect';
 import { Map } from 'immutable';
+import { reduce } from 'lodash/collection';
 
 import {
   selectEntities,
@@ -138,21 +139,40 @@ const selectRecommendationsBySpecialCategories = createSelector(
   selectRecommendationTaxonomies,
   selectSpecialCategoryQuery,
   (entities, taxonomies, query) => {
-    if (query && query.indexOf(':') > -1) {
-      const taxId = query.split(':')[0];
-      const specialQuery = query.split(':')[1];
-      if (specialQuery === 'most_recent') {
-        const taxonomy = taxonomies.get(taxId);
-        return entities.filter((entity) =>
-          testEntitySpecialCategoryAssociation(
-            entity,
-            taxonomy.get('categories'),
-            'most_recent',
-          )
-        );
+    if (CONFIG.taxonomies.specialOptions) {
+      let queryTaxId = '';
+      let value = '';
+      if (query && query.indexOf(':') > -1) {
+        queryTaxId = query.split(':')[0];
+        value = query.split(':')[1];
       }
-      return entities;
+      return reduce(CONFIG.taxonomies.specialOptions, (memo, option, taxId) => {
+        if (option.default && !query) {
+          const taxonomy = taxonomies.get(taxId);
+          return memo.filter((entity) =>
+            testEntitySpecialCategoryAssociation(
+              entity,
+              taxonomy.get('categories'),
+              option.attribute,
+            )
+          );
+        }
+        if (attributesEqual(queryTaxId, taxId) && value === option.attribute) {
+          const taxonomy = taxonomies.get(taxId);
+          return memo.filter((entity) =>
+            testEntitySpecialCategoryAssociation(
+              entity,
+              taxonomy.get('categories'),
+              'most_recent',
+            )
+          );
+        }
+        return memo;
+      }, entities);
     }
+    // if (query && query === '0') {
+    //   console.log('not special')
+    // }
     return entities;
   });
 // kicks off series of cascading selectors
