@@ -166,6 +166,7 @@ class OptionList extends React.PureComponent {
       });
 
     const hasMore = options.size < this.props.options.size;
+
     return (
       <Styled>
         <ListWrapper>
@@ -217,13 +218,13 @@ class OptionList extends React.PureComponent {
                         secondary={this.props.secondary}
                       >
                         <Option
-                          bold={option.get('labelBold') || checked}
                           reference={typeof option.get('reference') !== 'undefined' && option.get('reference') !== null ? option.get('reference').toString() : ''}
                           label={option.get('label')}
                           messagePrefix={option.get('messagePrefix')}
                           message={option.get('message')}
                           isNew={option.get('isNew')}
                           draft={option.get('draft')}
+                          italic={group.get('special') || option.get('italic')}
                         />
                       </OptionLabel>
                       { option.get('showCount') && typeof option.get('count') !== 'undefined' &&

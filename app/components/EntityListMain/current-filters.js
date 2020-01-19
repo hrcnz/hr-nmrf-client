@@ -134,7 +134,7 @@ const getCurrentTaxonomyFilters = (
       const option = taxonomyFilters.specialOptions[taxId];
       if (option && specialQuery === option.attribute) {
         tags.push({
-          label: option.label,
+          message: option.message,
           type: 'taxonomies',
           id: taxId,
           onClick: () => onClick({
@@ -151,7 +151,7 @@ const getCurrentTaxonomyFilters = (
     forEach(taxonomyFilters.specialOptions, (option, taxId) => {
       if (option.default) {
         tags.push({
-          label: option.label,
+          message: option.message,
           type: 'taxonomies',
           id: taxId,
           onClick: () => onClick({

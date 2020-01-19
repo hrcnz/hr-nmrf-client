@@ -248,7 +248,8 @@ export const makeTaxonomyFilterOptions = (entities, config, taxonomies, activeTa
               } else {
                 const value = `${activeTaxId}:${special.attribute}`;
                 filterOptions.options[special.attribute] = {
-                  label: special.label,
+                  message: special.message,
+                  label: !special.message && special.attribute,
                   showCount: true,
                   value,
                   count: 1,
@@ -270,7 +271,7 @@ export const makeTaxonomyFilterOptions = (entities, config, taxonomies, activeTa
             filterOptions.options.without = {
               label: `${messages.without} ${lowerCase(getTaxTitle(parseInt(taxonomy.get('id'), 10), contextIntl))}`,
               showCount: true,
-              labelBold: true,
+              italic: true,
               value: taxonomy.get('id'),
               count: 1,
               query: 'without',

@@ -13,6 +13,7 @@ import messages from './messages';
 
 const Label = styled.div`
   font-weight: ${(props) => props.bold ? 500 : 'normal'};
+  font-style: ${(props) => props.italic ? 'italic' : 'normal'};
   position: relative;
 `;
 const New = styled.span`
@@ -36,8 +37,7 @@ const IdSpacer = styled.span`
 class Option extends React.Component { // eslint-disable-line react/prefer-stateless-function
 
   render() {
-    const { draft, reference, message, label, messagePrefix, isNew } = this.props;
-
+    const { draft, reference, message, label, messagePrefix, isNew, italic } = this.props;
     let optionLabel;
     if (message) {
       optionLabel = messagePrefix
@@ -49,7 +49,7 @@ class Option extends React.Component { // eslint-disable-line react/prefer-state
 
 
     return (
-      <Label bold={false}>
+      <Label bold={false} italic={italic}>
         {draft &&
           <ItemStatus draft top />
         }
@@ -77,6 +77,7 @@ Option.propTypes = {
   reference: PropTypes.string,
   draft: PropTypes.bool,
   isNew: PropTypes.bool,
+  italic: PropTypes.bool,
 };
 
 Option.contextTypes = {

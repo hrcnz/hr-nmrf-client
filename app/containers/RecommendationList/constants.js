@@ -49,7 +49,8 @@ export const CONFIG = {
     defaultGroupAttribute: 'groups_recommendations_default',
     specialOptions: {
       [CYCLE_TAXONOMY_ID]: {
-        label: 'Most recent cycles',
+        label: 'entities.taxonomies.most_recent',
+        message: 'entities.taxonomies.most_recent',
         attribute: 'most_recent',
         default: true,
       },

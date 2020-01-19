@@ -774,6 +774,10 @@ export default defineMessages({
         id: 'app.containers.App.entities.taxonomies.children',
         defaultMessage: 'Child categories',
       },
+      most_recent: {
+        id: 'app.containers.App.entities.taxonomies.most_recent',
+        defaultMessage: 'Most recent',
+      },
       1: {
         single: {
           id: 'app.containers.App.entities.taxonomies.1.single',
