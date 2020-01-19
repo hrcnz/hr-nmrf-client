@@ -170,9 +170,6 @@ const selectRecommendationsBySpecialCategories = createSelector(
         return memo;
       }, entities);
     }
-    // if (query && query === '0') {
-    //   console.log('not special')
-    // }
     return entities;
   });
 // kicks off series of cascading selectors

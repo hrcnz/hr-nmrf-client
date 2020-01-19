@@ -69,7 +69,7 @@ export const getConnectedCategories = (entityConnectedIds, taxonomyCategories, p
 // assumes prior nesting of relationships
 export const filterEntitiesWithoutAssociation = (entities, categories, query) =>
   entities && entities.filter((entity) =>
-    asList(query).some((pathOrTax) =>
+    asList(query).every((pathOrTax) =>
       !(isNumber(pathOrTax)
         ? testEntityTaxonomyAssociation(entity, categories, parseInt(pathOrTax, 10))
         : testEntityAssociation(entity, pathOrTax)
@@ -81,7 +81,7 @@ export const filterEntitiesWithoutAssociation = (entities, categories, query) =>
 // assumes prior nesting of relationships
 export const filterEntitiesByCategories = (entities, query) =>
   entities && entities.filter((entity) =>
-    asList(query).some((categoryId) =>
+    asList(query).every((categoryId) =>
       testEntityCategoryAssociation(entity, parseInt(categoryId, 10)))
   );
 
@@ -89,7 +89,7 @@ export const filterEntitiesByCategories = (entities, query) =>
 // assumes prior nesting of relationships
 export const filterEntitiesByConnectedCategories = (entities, connections, query) =>
   entities && entities.filter((entity) =>
-    asList(query).some((queryArg) => {
+    asList(query).every((queryArg) => {
       const pathValue = queryArg.split(':');
       const path = pathValue[0];
       const connectionsForPath = connections.get(path);
@@ -104,7 +104,7 @@ export const filterEntitiesByConnectedCategories = (entities, connections, query
 // assumes prior nesting of relationships
 export const filterEntitiesByConnection = (entities, query) =>
   entities && entities.filter((entity) =>
-    asList(query).some((queryArg) => {
+    asList(query).every((queryArg) => {
       const pathValue = queryArg.split(':');
       const path = pathValue[0];
       return entity.get(path) && testEntityEntityAssociation(entity, path, pathValue[1]);
